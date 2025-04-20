@@ -32,18 +32,26 @@ async def proxy_csv(url: str):
         ```
     """
     async def stream_csv():
-        async with httpx.AsyncClient() as client:
-            # Use stream=True to avoid loading the entire file into memory
-            async with client.stream("GET", url) as response:
-                if response.status_code != 200:
-                    # If there's an error, we need to handle it differently
-                    # since we're in a generator
-                    yield f"Error: Failed to fetch CSV: {response.status_code}".encode()
-                    return
-                
-                # Stream the response in chunks
-                async for chunk in response.aiter_bytes():
-                    yield chunk
+        try:
+            # Set a timeout for the request (30 seconds)
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                # Use stream=True to avoid loading the entire file into memory
+                async with client.stream("GET", url) as response:
+                    if response.status_code != 200:
+                        # If there's an error, we need to handle it differently
+                        # since we're in a generator
+                        yield f"Error: Failed to fetch CSV: {response.status_code}".encode()
+                        return
+                    
+                    # Stream the response in chunks
+                    async for chunk in response.aiter_bytes():
+                        yield chunk
+        except httpx.ConnectTimeout:
+            yield "Error: Connection timed out while trying to fetch the CSV file.".encode()
+        except httpx.ReadTimeout:
+            yield "Error: Read timed out while streaming the CSV file.".encode()
+        except Exception as e:
+            yield f"Error: Failed to fetch CSV: {str(e)}".encode()
     
     return StreamingResponse(
         stream_csv(),
