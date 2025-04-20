@@ -6,6 +6,8 @@ import uvicorn
 
 app = FastAPI()
 
+HTTP_TIMEOUT=60.0
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -27,14 +29,14 @@ async def proxy_csv(url: str):
     testing:
 
         ```bash
-        export EXAMPLE_CSV_URL=https://www.stats.govt.nz/assets/Uploads/Business-operations-survey/Business-operations-survey-2022/Download-data/business-operations-survey-2022-business-finance.csv
+        export EXAMPLE_CSV_URL=https://cdn.wsform.com/wp-content/uploads/2020/06/industry.csv
         curl "http://localhost:8000/proxy/csv?url=$EXAMPLE_CSV_URL" > downloaded.csv
         ```
     """
     async def stream_csv():
         try:
             # Set a timeout for the request (30 seconds)
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
                 # Use stream=True to avoid loading the entire file into memory
                 async with client.stream("GET", url) as response:
                     if response.status_code != 200:
