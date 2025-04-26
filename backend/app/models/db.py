@@ -1,5 +1,6 @@
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey, func
-from sqlalchemy.dialects.postgresql import UUID, VECTOR
+from sqlalchemy.dialects.postgresql import UUID
+from pgvector.sqlalchemy import Vector
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
@@ -37,7 +38,7 @@ class DatasetCatalog(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     source = Column(String, nullable=False)
     source_at = Column(DateTime(timezone=True), nullable=False)
-    embedding = Column(VECTOR(768))  # Gemini embedding dimension
+    embedding = Column(Vector(768))  # Gemini embedding dimension
 
 class ReferenceQuery(Base):
     __tablename__ = "reference_queries"
@@ -46,7 +47,7 @@ class ReferenceQuery(Base):
     title = Column(String, nullable=False)
     description = Column(Text, nullable=False)
     sql_query = Column(Text, nullable=False)
-    embedding = Column(VECTOR(768))  # Gemini embedding dimension
+    embedding = Column(Vector(768))  # Gemini embedding dimension
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
