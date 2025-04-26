@@ -34,8 +34,12 @@ MainData.id - Backend Specification
 | id | UUID | PK |
 | title | TEXT | Dataset title |
 | description | TEXT | Short description |
-| url | TEXT | Link to source |
-| embedding | VECTOR(1536) | pgvector |
+| url | TEXT | Public url to dataset |
+| info_url | TEXT | Link to detailed info of the original dataset |
+| created_at | DATETIME | Time the dataset inserted into catalog |
+| source | TEXT | identifier for the data's source |
+| source_at | DATETIME | Time the source originally publish the dataset |
+| embedding | VECTOR(<EMBEDDING SIZE>) | pgvector |
 
 ---
 
@@ -47,7 +51,7 @@ MainData.id - Backend Specification
 | title | TEXT | Example title |
 | description | TEXT | Query explanation |
 | sql_query | TEXT | SQL string |
-| embedding | VECTOR(1536) | pgvector |
+| embedding | VECTOR(<EMBEDDING SIZE>) | pgvector |
 
 ---
 
