@@ -1,5 +1,11 @@
 import asyncio
 from logging.config import fileConfig
+import os
+import sys
+from pathlib import Path
+
+# Add the parent directory to Python path
+sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
@@ -7,7 +13,6 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 from app.models.db import Base
-import os
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -26,12 +31,10 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 # Get database URL from environment variables
-config.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"])
-
-# Other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
+db_url = os.environ["DATABASE_URL"]
+if db_url.startswith("postgresql://"):
+    db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+config.set_main_option("sqlalchemy.url", db_url)
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.

@@ -98,6 +98,12 @@ pnpm dev
 cd backend
 uv sync
 
+# copy & edit .env.example into .env
+cp .env.example .env
+
+# run db migrations
+uv run alembic upgrade head
+
 # for dev
 uv run fastapi dev --host 0.0.0.0
 # alternative if above doesn't work
