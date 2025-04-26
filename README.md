@@ -94,12 +94,14 @@ pnpm dev
 ```
 ### ⚙️ Run Backend
 
-```
+```bash
 cd backend
-uv install
+uv sync
 
 # for dev
 uv run fastapi dev --host 0.0.0.0
+# alternative if above doesn't work
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
 # for prod
 uvicorn main:app --host 0.0.0.0 --port 8000

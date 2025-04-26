@@ -1,25 +1,38 @@
-from fastapi import FastAPI, Response
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-import httpx
 import uvicorn
+import httpx
 
-app = FastAPI()
+from app.routes import generate_sql, session
+from app.models.db import init_db
 
-HTTP_TIMEOUT=60.0
+app = FastAPI(
+    title="MainData.id API",
+    description="Backend API for natural language to SQL translation",
+    version="1.0.0"
+)
 
-# Add CORS middleware
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Update this with your frontend domain in production
+    allow_origins=["*"],  # Restrict in production
     allow_credentials=True,
-    allow_methods=["GET"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.get("/")
-async def home():
-    return 'ok'
+# Include routers
+app.include_router(generate_sql.router, tags=["SQL Generation"])
+app.include_router(session.router, tags=["Chat Sessions"])
+
+@app.on_event("startup")
+async def startup():
+    await init_db()
+
+@app.get("/", tags=["Health Check"])
+async def root():
+    return {"status": "online", "message": "MainData.id API is running"}
 
 @app.get("/proxy/csv")
 async def proxy_csv(url: str):
@@ -62,4 +75,4 @@ async def proxy_csv(url: str):
     )
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
