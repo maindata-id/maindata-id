@@ -38,7 +38,10 @@ async def get_relevant_datasets(
             id=dataset.id,
             title=dataset.title,
             description=dataset.description,
-            url=dataset.url
+            url=dataset.url,
+            info_url=dataset.info_url,
+            source=dataset.source,
+            source_at=dataset.source_at
         )
         for dataset in datasets
     ]

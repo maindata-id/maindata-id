@@ -12,7 +12,7 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 genai.configure(api_key=GOOGLE_API_KEY)
 
 # Initialize the model
-model = genai.GenerativeModel('gemini-pro')
+model = genai.GenerativeModel('gemini-2.5-pro-exp-03-25')
 
 async def generate_sql_from_nl(
     question: str,
@@ -31,7 +31,7 @@ async def generate_sql_from_nl(
     
     # Format dataset information
     dataset_context = "\n".join([
-        f"- {dataset.title}: {dataset.description}"
+        f"- {dataset.title} [url: {dataset.url}]: {dataset.description}"
         for dataset in datasets
     ])
     
