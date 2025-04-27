@@ -93,6 +93,18 @@ create table rata_rata_konsumesi_per_jenis_pangan as
 """
     },
     {
+        "title": "Tren bulan dengan jumlah sampah terbanyak di kota bandung",
+        "description": "Menampilkan Tren bulan dengan jumlah sampah terbanyak di kota bandung dari tahun 2017-2024",
+        "sql_query": """
+CREATE TABLE sampah_bandung AS
+SELECT * FROM read_csv('https://opendata.bandung.go.id/api/bigdata/dinas_lingkungan_hidup/jumlah_capaian_penanganan_sampah_di_kota_bandung?download=csv');
+SELECT bulan, SUM(jumlah_sampah) as total_sampah
+FROM sampah_bandung
+GROUP BY bulan
+ORDER BY total_sampah desc;
+"""
+    },
+    {
         "title": "Tren Anggaran Pendidikan",
         "description": "Menampilkan tren anggaran pendidikan dari tahun 2018-2022",
         "sql_query": """
