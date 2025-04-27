@@ -1,15 +1,42 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ChatContainer } from "@/components/chat/chat-container"
 
-export default function QueryPage() {
+export default function QueryPage({ params }: { params: { sessionId: string } }) {
   const searchParams = useSearchParams()
-  const naturalLanguageQuery = searchParams.get("q") || ""
+  const sessionId = params.sessionId
   const datasetParam = searchParams.get("dataset") || ""
+  const [initialQuery, setInitialQuery] = useState<string | null>(null)
+
+  // Check for initial query in sessionStorage  setInitialQuery] = useState<string | null>(null)
+
+  // Check for initial query in sessionStorage
+  useEffect(() => {
+    // Try to get the query from sessionStorage first
+    const storedQuery = sessionStorage.getItem(`query_${sessionId}`)
+    if (storedQuery) {
+      setInitialQuery(storedQuery)
+      // Clean up after retrieving
+      sessionStorage.removeItem(`query_${sessionId}`)
+      return
+    }
+
+    // If not in sessionStorage, try to get from cookies
+    const cookies = document.cookie.split(";")
+    for (const cookie of cookies) {
+      const [name, value] = cookie.trim().split("=")
+      if (name === `query_${sessionId}`) {
+        setInitialQuery(decodeURIComponent(value))
+        // No need to clean up cookies as they're handled by the server
+        return
+      }
+    }
+  }, [sessionId])
 
   return (
     <div className="flex flex-col h-screen">
@@ -29,7 +56,7 @@ export default function QueryPage() {
 
       <main className="flex-1 overflow-hidden">
         <div className="h-full">
-          <ChatContainer initialQuery={naturalLanguageQuery} initialDataset={datasetParam} />
+          <ChatContainer sessionId={sessionId} initialQuery={initialQuery} initialDataset={datasetParam} />
         </div>
       </main>
 

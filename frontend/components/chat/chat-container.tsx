@@ -3,13 +3,17 @@
 import { useEffect, useRef, useState } from "react"
 import { ChatMessage, type MessageType } from "./chat-message"
 import { ChatInput } from "./chat-input"
-import { executeQuery, isUsingMockData } from "@/lib/duckdb"
-import { translateToSql } from "@/lib/llm"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertTriangle, RefreshCcw } from "lucide-react"
+import { executeQuery, getTables, type QueryResult } from "@/lib/duckdb"
+import { translateToSql, setCurrentSessionId } from "@/lib/llm"
+import { DuckDBStatus } from "./duckdb-status"
+import { useDuckDB } from "@/components/duckdb-provider"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Database, Settings } from "lucide-react"
+import { getQueryDescription } from "@/lib/sql-parser"
+import type { Dataset, QueryReference } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
-import { resetMockDataFlag } from "@/lib/duckdb"
+import { ApiSettingsDialog } from "./api-settings-dialog"
+import { ApiStatus } from "./api-status"
 
 export interface Message {
   id: string
@@ -17,24 +21,37 @@ export interface Message {
   content: string
   timestamp: Date
   isSQL: boolean
-  results?: any[]
+  queryResults?: QueryResult[]
   error?: string
   isLoading?: boolean
   sqlQuery?: string
   datasetName?: string
+  explanation?: string
+  datasets?: Dataset[]
+  references?: QueryReference[]
 }
 
 interface ChatContainerProps {
-  initialQuery?: string
+  sessionId?: string
+  initialQuery?: string | null
   initialDataset?: string
-  isDuckDBReady: boolean
-  isDuckDBLoading: boolean
 }
 
-export function ChatContainer({ initialQuery, initialDataset, isDuckDBReady, isDuckDBLoading }: ChatContainerProps) {
+export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatContainerProps) {
   const [messages, setMessages] = useState<Message[]>([])
-  const [isMockMode, setIsMockMode] = useState(false)
+  const [tables, setTables] = useState<string[]>([])
+  const [tablesLoaded, setTablesLoaded] = useState(false)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [initialQueryProcessed, setInitialQueryProcessed] = useState(false)
   const chatEndRef = useRef<HTMLDivElement>(null)
+  const { isReady: isDuckDBReady } = useDuckDB()
+
+  // Set the session ID if provided
+  useEffect(() => {
+    if (sessionId) {
+      setCurrentSessionId(sessionId)
+    }
+  }, [sessionId])
 
   // Welcome message
   useEffect(() => {
@@ -43,8 +60,7 @@ export function ChatContainer({ initialQuery, initialDataset, isDuckDBReady, isD
         {
           id: "welcome",
           type: "system",
-          content:
-            "Welcome to MainData.id! Ask a question about Indonesian government data or write a SQL query to explore the datasets.",
+          content: "Welcome to MainData.id! You can create tables and query data using SQL or natural language.",
           timestamp: new Date(),
           isSQL: false,
         },
@@ -52,20 +68,68 @@ export function ChatContainer({ initialQuery, initialDataset, isDuckDBReady, isD
     }
   }, [messages.length])
 
-  // Process initial query if provided
+  // Load available tables when DuckDB is ready
   useEffect(() => {
-    if (initialQuery && isDuckDBReady && messages.length === 1) {
-      handleSendMessage(initialQuery, false)
-    } else if (initialDataset && isDuckDBReady && messages.length === 1) {
-      const sql = `SELECT * FROM ${initialDataset} LIMIT 100`
-      handleSendMessage(sql, true)
-    }
-  }, [initialQuery, initialDataset, isDuckDBReady, messages.length])
+    if (isDuckDBReady && !tablesLoaded) {
+      getTables()
+        .then((availableTables) => {
+          setTables(availableTables)
+          setTablesLoaded(true)
 
-  // Update mock mode status whenever it might change
+          // Add a message about available tables
+          if (availableTables.length === 0) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: "no-tables",
+                type: "system",
+                content: "No tables found. You can create tables using SQL queries.",
+                timestamp: new Date(),
+                isSQL: false,
+              },
+            ])
+          } else {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: "tables-info",
+                type: "system",
+                content: `Available tables: ${availableTables.join(", ")}`,
+                timestamp: new Date(),
+                isSQL: false,
+              },
+            ])
+          }
+        })
+        .catch((error) => {
+          console.error("Failed to load tables:", error)
+        })
+    }
+  }, [isDuckDBReady, tablesLoaded])
+
+  // Process initial query or dataset if provided
   useEffect(() => {
-    setIsMockMode(isUsingMockData())
-  }, [isDuckDBReady])
+    if (isDuckDBReady && messages.length > 0 && !initialQueryProcessed) {
+      setInitialQueryProcessed(true)
+
+      if (initialQuery) {
+        // Check if it looks like SQL (simple heuristic)
+        const isSql =
+          initialQuery.trim().toUpperCase().startsWith("SELECT") ||
+          initialQuery.trim().toUpperCase().startsWith("CREATE") ||
+          initialQuery.trim().toUpperCase().startsWith("INSERT") ||
+          initialQuery.trim().toUpperCase().startsWith("UPDATE") ||
+          initialQuery.trim().toUpperCase().startsWith("DELETE") ||
+          initialQuery.trim().toUpperCase().startsWith("DROP") ||
+          initialQuery.trim().toUpperCase().startsWith("ALTER")
+
+        handleSendMessage(initialQuery, isSql)
+      } else if (initialDataset) {
+        const sql = `SELECT * FROM ${initialDataset} LIMIT 100`
+        handleSendMessage(sql, true)
+      }
+    }
+  }, [initialQuery, initialDataset, isDuckDBReady, messages.length, initialQueryProcessed])
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -73,7 +137,7 @@ export function ChatContainer({ initialQuery, initialDataset, isDuckDBReady, isD
   }, [messages])
 
   const handleSendMessage = async (content: string, isSQL: boolean) => {
-    if (!content.trim()) return
+    if (!content.trim() || !isDuckDBReady) return
 
     // Generate unique ID for the message
     const messageId = `msg-${Date.now()}`
@@ -105,36 +169,69 @@ export function ChatContainer({ initialQuery, initialDataset, isDuckDBReady, isD
     try {
       let sqlQuery = content
       let datasetName = ""
+      let queryResults: QueryResult[] = []
+      let explanation: string | undefined
+      let datasets: Dataset[] | undefined
+      let references: QueryReference[] | undefined
 
       // If not SQL, translate to SQL first
       if (!isSQL) {
         const translation = await translateToSql(content)
         sqlQuery = translation.sql
         datasetName = translation.datasetName
-      }
+        explanation = translation.explanation
+        datasets = translation.datasets
+        references = translation.references
 
-      // Execute the query
-      const results = await executeQuery(sqlQuery)
+        // Execute the translated SQL query
+        queryResults = await executeQuery(sqlQuery)
+      } else {
+        // Execute the SQL query directly
+        queryResults = await executeQuery(content)
+      }
 
       // Remove loading message
       setMessages((prev) => prev.filter((msg) => msg.id !== loadingMessageId))
+
+      // Check if any DDL statements were executed
+      const hasDdlStatements = queryResults.some((result) => result.isDdl)
+
+      // If there were DDL statements, refresh the table list
+      if (hasDdlStatements) {
+        try {
+          const updatedTables = await getTables()
+          setTables(updatedTables)
+        } catch (error) {
+          console.error("Failed to refresh tables after DDL:", error)
+        }
+      }
+
+      // Generate a summary of what happened
+      let resultSummary = ""
+      if (!isSQL) {
+        resultSummary = `I've translated your question to SQL and executed it.`
+      } else if (queryResults.length === 1) {
+        resultSummary = getQueryDescription(queryResults[0].sql)
+      } else {
+        resultSummary = `Executed ${queryResults.length} SQL statements.`
+      }
 
       // Add result message
       const resultMessage: Message = {
         id: `result-${Date.now()}`,
         type: "system",
-        content: isSQL ? "Query executed successfully." : `I've translated your question to SQL:`,
+        content: resultSummary,
         timestamp: new Date(),
         isSQL: false,
-        results,
-        sqlQuery,
+        queryResults,
+        sqlQuery: !isSQL ? sqlQuery : undefined,
         datasetName,
+        explanation,
+        datasets,
+        references,
       }
 
       setMessages((prev) => [...prev, resultMessage])
-
-      // Update mock mode status
-      setIsMockMode(isUsingMockData())
     } catch (err: any) {
       // Remove loading message
       setMessages((prev) => prev.filter((msg) => msg.id !== loadingMessageId))
@@ -153,62 +250,51 @@ export function ChatContainer({ initialQuery, initialDataset, isDuckDBReady, isD
     }
   }
 
-  const handleResetMockMode = () => {
-    resetMockDataFlag()
-    setIsMockMode(false)
-
-    // Add system message about reset
-    const resetMessage: Message = {
-      id: `reset-${Date.now()}`,
-      type: "system",
-      content: "Attempting to switch back to DuckDB mode. Your next query will try to use DuckDB.",
-      timestamp: new Date(),
-      isSQL: false,
-    }
-
-    setMessages((prev) => [...prev, resetMessage])
-  }
-
   return (
     <div className="flex flex-col h-full">
-      {isDuckDBLoading ? (
-        <div className="flex-1 p-4 flex items-center justify-center">
-          <div className="w-full max-w-md space-y-4">
-            <Skeleton className="h-[60px] w-full" />
-            <Skeleton className="h-[100px] w-full" />
-            <Skeleton className="h-[40px] w-3/4 mx-auto" />
-          </div>
+      <div className="border-b flex justify-between items-center">
+        <div className="flex items-center gap-2">
+          <DuckDBStatus />
+          <ApiStatus />
+          {sessionId && (
+            <div className="px-2 py-1 text-xs bg-muted rounded-md">Session: {sessionId.substring(0, 8)}...</div>
+          )}
         </div>
-      ) : (
-        <>
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {isMockMode && (
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle className="flex items-center gap-2">
-                  Demo Mode
-                  <Button variant="outline" size="sm" onClick={handleResetMockMode} className="ml-2">
-                    <RefreshCcw className="w-3 h-3 mr-1" />
-                    Try Real DuckDB
-                  </Button>
-                </AlertTitle>
-                <AlertDescription>
-                  Currently using mock data instead of DuckDB. SQL syntax errors will still be displayed correctly.
-                </AlertDescription>
-              </Alert>
-            )}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="mr-2"
+          onClick={() => setIsSettingsOpen(true)}
+          title="API Settings"
+        >
+          <Settings className="h-4 w-4" />
+        </Button>
+      </div>
 
-            {messages.map((message) => (
-              <ChatMessage key={message.id} message={message} />
-            ))}
-            <div ref={chatEndRef} />
-          </div>
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {isDuckDBReady && tables.length === 0 && tablesLoaded && (
+          <Alert>
+            <Database className="h-4 w-4" />
+            <AlertDescription>
+              No tables found in the database. You can create tables using SQL queries like:
+              <pre className="mt-2 p-2 bg-muted rounded-md text-xs overflow-x-auto">
+                CREATE TABLE example (id INTEGER, name VARCHAR, value DOUBLE);
+              </pre>
+            </AlertDescription>
+          </Alert>
+        )}
 
-          <div className="border-t p-4">
-            <ChatInput onSendMessage={handleSendMessage} disabled={!isDuckDBReady} />
-          </div>
-        </>
-      )}
+        {messages.map((message) => (
+          <ChatMessage key={message.id} message={message} />
+        ))}
+        <div ref={chatEndRef} />
+      </div>
+
+      <div className="border-t p-4">
+        <ChatInput onSendMessage={handleSendMessage} disabled={!isDuckDBReady} />
+      </div>
+
+      <ApiSettingsDialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
     </div>
   )
 }

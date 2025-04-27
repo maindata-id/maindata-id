@@ -1,46 +1,74 @@
-// This is a mock implementation of LLM integration
-// In a real application, you would use an actual LLM API
+import { generateSQL, startSession, type Dataset, type QueryReference } from "./api-client"
 
-export async function translateToSql(naturalLanguageQuery: string): Promise<{ sql: string; datasetName: string }> {
+// Store the session ID
+let currentSessionId: string | null = null
+
+/**
+ * Set the current session ID
+ */
+export function setCurrentSessionId(sessionId: string) {
+  currentSessionId = sessionId
+  console.log("Set session ID:", sessionId)
+}
+
+/**
+ * Initialize a session if one doesn't exist
+ */
+export async function ensureSession(): Promise<string> {
+  if (!currentSessionId) {
+    try {
+      const session = await startSession("MainData.id Explorer Session")
+      currentSessionId = session.session_id
+      console.log("Created new session:", currentSessionId)
+    } catch (error) {
+      console.error("Failed to create session:", error)
+      throw error
+    }
+  }
+  return currentSessionId
+}
+
+/**
+ * Translate natural language to SQL
+ */
+export async function translateToSql(naturalLanguageQuery: string): Promise<{
+  sql: string
+  datasetName: string
+  explanation?: string
+  datasets?: Dataset[]
+  references?: QueryReference[]
+}> {
   console.log("Translating to SQL:", naturalLanguageQuery)
 
-  // Simulate API call delay
-  await new Promise((resolve) => setTimeout(resolve, 1200))
+  try {
+    // Ensure we have a session
+    const sessionId = await ensureSession()
 
-  const query = naturalLanguageQuery.toLowerCase()
+    // Call the API to generate SQL
+    const result = await generateSQL(sessionId, naturalLanguageQuery)
 
-  // Simple pattern matching to generate SQL
-  if (query.includes("penduduk dki jakarta") || query.includes("jakarta")) {
+    // Extract dataset name from the first dataset if available
+    const datasetName = result.datasets_used.length > 0 ? result.datasets_used[0].title : "Query Result"
+
     return {
-      sql: "SELECT year, population FROM population_dki ORDER BY year ASC",
-      datasetName: "Penduduk DKI Jakarta",
+      sql: result.sql,
+      datasetName,
+      explanation: result.explanation,
+      datasets: result.datasets_used,
+      references: result.reference_queries_used,
     }
-  }
+  } catch (error) {
+    console.error("Error translating to SQL:", error)
 
-  if (query.includes("anggaran pendidikan") || query.includes("pendidikan")) {
+    // Create a more user-friendly error message
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error occurred while communicating with the translation service"
+
+    // Return a SQL query that will display the error message
     return {
-      sql: "SELECT province, budget FROM education_budget WHERE year = 2022 ORDER BY budget DESC LIMIT 10",
-      datasetName: "Anggaran Pendidikan",
+      sql: `SELECT 'API Error: ${errorMessage.replace(/'/g, "''")}' as error_message`,
+      datasetName: "Error",
+      explanation: `There was an error communicating with the translation service: ${errorMessage}`,
     }
-  }
-
-  if (query.includes("kemiskinan") || query.includes("poverty")) {
-    return {
-      sql: "SELECT province, poverty_rate FROM poverty_rate WHERE year = 2022 ORDER BY poverty_rate DESC",
-      datasetName: "Angka Kemiskinan",
-    }
-  }
-
-  if (query.includes("ipm") || query.includes("sumatera barat")) {
-    return {
-      sql: "SELECT year, AVG(hdi_score) as avg_hdi FROM hdi_data WHERE province = 'Sumatera Barat' AND year >= 2010 GROUP BY year ORDER BY year",
-      datasetName: "Indeks Pembangunan Manusia (IPM)",
-    }
-  }
-
-  // Default fallback
-  return {
-    sql: "SELECT * FROM population_dki LIMIT 10",
-    datasetName: "Dataset tidak ditemukan",
   }
 }
