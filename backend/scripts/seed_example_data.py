@@ -86,7 +86,7 @@ EXAMPLE_DATASETS = [
 EXAMPLE_QUERIES = [
     {
         "title": "load data 'Rata-rata Konsumsi per Jenis Pangan Penduduk Indonesia Provinsi' ke user",
-        "description": "load data 'Rata-rata Konsumsi per Jenis Pangan Penduduk Indonesia Provinsi' ke user",
+        "description": "load data 'Rata-rata Konsumsi per Jenis Pangan Penduduk Indonesia Provinsi' ke user. here we use read_csv('{BASE_URL}/proxy/csv?url=<DATASET URL>') method as the proxy/csv endpoint is a local endpoint for retrieving third-party dataset data without any CORS restriction",
         "sql_query": f"""
 create table rata_rata_konsumesi_per_jenis_pangan as 
    select * from read_csv('{BASE_URL}/proxy/csv?url=https://satudata.badanpangan.go.id/download/document/dataset/44/1728615152.csv/csv');
