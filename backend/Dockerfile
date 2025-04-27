@@ -6,8 +6,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 WORKDIR /app
 
 # Copy requirements and install dependencies
-COPY ./pyproject.toml /app/pyproject.toml
-COPY ./uv.lock /app/uv.lock
+COPY pyproject.toml  uv.lock ./
 RUN uv sync --frozen --no-cache
 
 # Copy application code
