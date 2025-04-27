@@ -51,6 +51,7 @@ When generating SQL:
 3. Consider the Indonesian context of the data
 4. Make use of the example queries if relevant
 5. Return both the SQL and a brief explanation
+6. Because the SQL query would be used in an ephemeral duckdb environment, make sure to always load the data from URL source using `CREATE TABLE local_table_name AS SELECT * FROM read_csv(<CSV_URL>);` query before doing the actual SQL query.
 
 Conversation history:
 {formatted_history if formatted_history else "No previous conversation."}
