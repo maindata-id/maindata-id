@@ -16,6 +16,7 @@ revision = '48bf639d3c32'
 down_revision = None
 branch_labels = None
 depends_on = None
+VECTOR_EMBEDDING_SIZE=768 #gemini AI embedding
 
 
 def upgrade() -> None:
@@ -31,7 +32,7 @@ def upgrade() -> None:
         sa.Column('title', sa.String(), nullable=False),
         sa.Column('description', sa.Text(), nullable=False),
         sa.Column('url', sa.String(), nullable=True),
-        sa.Column('embedding', Vector(1536), nullable=True),
+        sa.Column('embedding', Vector(VECTOR_EMBEDDING_SIZE), nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
         sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
     )
@@ -42,7 +43,7 @@ def upgrade() -> None:
         sa.Column('title', sa.String(), nullable=False),
         sa.Column('description', sa.Text(), nullable=False),
         sa.Column('sql_query', sa.Text(), nullable=False),
-        sa.Column('embedding', Vector(1536), nullable=True),
+        sa.Column('embedding', Vector(VECTOR_EMBEDDING_SIZE), nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
         sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
     )

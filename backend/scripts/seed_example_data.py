@@ -1,6 +1,6 @@
 import asyncio
 import os
-import json
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -16,6 +16,8 @@ from app.utils.embedding import get_embedding
 
 # Load environment variables
 load_dotenv()
+
+BASE_URL="http://localhost:8000"
 
 # Get database URL from environment
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -33,48 +35,61 @@ AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=F
 # Example datasets
 EXAMPLE_DATASETS = [
     {
-        "title": "Penduduk Indonesia per Provinsi",
-        "description": "Dataset populasi penduduk Indonesia per provinsi dari tahun 2010-2022",
-        "url": "https://data.go.id/dataset/penduduk-indonesia"
+        "title": "Jumlah Capaian Penanganan Sampah di Kota Bandung",
+        "description": """
+            Dataset ini berisi data jumlah capaian penanganan sampah di Kota Bandung dari tahun 2017 s.d. 2024.
+
+            Dataset terkait topik Lingkungan Hidup ini dihasilkan oleh Dinas Lingkungan Hidup yang dikeluarkan dalam periode 1 tahun sekali.
+
+            Penjelasan mengenai variabel di dalam dataset ini:
+
+                kode_provinsi: menyatakan kode Provinsi Jawa Barat sesuai ketentuan BPS merujuk pada aturan Peraturan Badan Pusat Statistik Nomor 3 Tahun 2019 dengan tipe data numerik.
+                nama_provinsi: menyatakan lingkup data berasal dari wilayah Provinsi Jawa Barat sesuai ketentuan BPS merujuk pada aturan Peraturan Badan Pusat Statistik Nomor 3 Tahun 2019 dengan tipe data teks.
+                kode_kabupaten_kota: menyatakan kode dari tiap-tiap kabupaten dan kota di Provinsi Jawa Barat sesuai ketentuan BPS merujuk pada aturan Peraturan Badan Pusat Statistik Nomor 3 Tahun 2019 dengan tipe data numerik.
+                nama_kabupaten_kota: menyatakan lingkup data berasal dari tiap-tiap kabupaten dan kota di Provinsi Jawa Barat sesuai penamaan BPS  merujuk pada aturan Peraturan Badan Pusat Statistik Nomor 3 Tahun 2019 dengan tipe data teks.
+                bulan: menyatakan bulan pengangkutan sampah dengan tipe data teks.
+                jumlah_sampah: menyatakan jumlah sampah dengan tipe data numerik.
+                satuan: menyatakan satuan dari pengukuran jumlah sampah dalam ton dengan tipe data teks.
+                tahun: menyatakan tahun produksi data dengan tipe data numerik.
+        """,
+        "url": "https://opendata.bandung.go.id/api/bigdata/dinas_lingkungan_hidup/jumlah_capaian_penanganan_sampah_di_kota_bandung?download=csv",
+        "info_url": "https://opendata.bandung.go.id/dataset/jumlah-capaian-penanganan-sampah-di-kota-bandung",
+        "source_at": datetime(2025, 3, 6, tzinfo=timezone.utc),
+        "source": "opendata.bandung.go.id",
     },
     {
-        "title": "Anggaran Pendidikan Nasional",
-        "description": "Alokasi anggaran pendidikan nasional per tahun dari APBN",
-        "url": "https://data.go.id/dataset/anggaran-pendidikan"
+        "title": "Indeks Pembangunan Manusia menurut Provinsi, 2022-2024",
+        "description": "IPM dan komponennya untuk seluruh provinsi di Indonesia",
+        "url": "https://www.bps.go.id/9953c3a2-bea4-4f79-8994-31bb30ed65c5",
+        "info_url": "https://www.bps.go.id/id/statistics-table/2/NDk0IzI=/-metode-baru--indeks-pembangunan-manusia-menurut-provinsi.html",
+        "source_at": datetime(2024, 11, 15, tzinfo=timezone.utc),
+        "source": "bps.go.id",
     },
     {
-        "title": "Indeks Pembangunan Manusia (IPM)",
-        "description": "IPM per provinsi dari tahun 2010-2022 yang mengukur kesehatan, pendidikan, dan ekonomi",
-        "url": "https://data.go.id/dataset/ipm-indonesia"
+        "title": "Rata-rata Konsumsi per Jenis Pangan Penduduk Indonesia Provinsi",
+        "description": """
+            Metode perhitungan
+                1. Mengelompokkan pangan menjadi 9 kelompok pangan ( Padi-padian, umbi-umbian, pangan hewani, minyak dan lemak, buah/ biji berminyak, kacang-kacangan, gula, sayur dan buah, aneka bumbu dan bahan minuman). 2. Mengkonversi ke dalam bentuk, jenis, dan satuan yang sama. 3. Selanjutnya besaran energi setiap jenis pangan dijumlahkan menurut kelompok pangannya. 4. Menjumlahkan total konsumsi pangan dari masing-masing kelompok pangan sehingga akan diketahui total konsumsi pangan dari seluruh kelompok pangan.
+            Interpretasi
+                Semakin besar nilai rata-rata konsumsi pangan, semakin banyak konsumsi komoditas tersebut. 
+            Satuan Data
+                kg/kap/tahun
+        """,
+        "url": "https://satudata.badanpangan.go.id/download/document/dataset/44/1728615152.csv/csv",
+        "info_url": "https://satudata.badanpangan.go.id/datasetpublications/817/konsumsi-provinsi",
+        "source_at": datetime(2024, 10, 30, tzinfo=timezone.utc),
+        "source": "satudata.badanpangan.go.id",
     },
-    {
-        "title": "Tingkat Kemiskinan per Provinsi",
-        "description": "Persentase penduduk miskin per provinsi dari tahun 2015-2022",
-        "url": "https://data.go.id/dataset/kemiskinan-provinsi"
-    },
-    {
-        "title": "Pertumbuhan Ekonomi Regional",
-        "description": "PDRB dan pertumbuhan ekonomi per provinsi dari tahun 2018-2022",
-        "url": "https://data.go.id/dataset/pdrb-provinsi"
-    }
 ]
 
 # Example reference queries
 EXAMPLE_QUERIES = [
     {
-        "title": "Provinsi dengan Populasi Tertinggi",
-        "description": "Mencari 5 provinsi dengan populasi tertinggi pada tahun 2022",
-        "sql_query": """
-SELECT 
-    provinsi, 
-    populasi
-FROM 
-    penduduk_provinsi
-WHERE 
-    tahun = 2022
-ORDER BY 
-    populasi DESC
-LIMIT 5;
+        "title": "load data 'Rata-rata Konsumsi per Jenis Pangan Penduduk Indonesia Provinsi' ke user",
+        "description": "load data 'Rata-rata Konsumsi per Jenis Pangan Penduduk Indonesia Provinsi' ke user",
+        "sql_query": f"""
+create table rata_rata_konsumesi_per_jenis_pangan as 
+   select * from read_csv('{BASE_URL}/proxy/csv?url=https://satudata.badanpangan.go.id/download/document/dataset/44/1728615152.csv/csv');
 """
     },
     {
@@ -156,16 +171,22 @@ async def seed_data():
             combined_text = f"{dataset_data['title']} {dataset_data['description']}"
             embedding = await get_embedding(combined_text)
             
-            # Create dataset record
-            dataset = DatasetCatalog(
-                id=uuid.uuid4(),
-                title=dataset_data["title"],
-                description=dataset_data["description"],
-                url=dataset_data["url"],
-                embedding=embedding
-            )
-            session.add(dataset)
-            print(f"Added dataset: {dataset.title}")
+            if embedding:
+                # Create dataset record
+                dataset = DatasetCatalog(
+                    id=uuid.uuid4(),
+                    title=dataset_data["title"],
+                    description=dataset_data["description"],
+                    url=dataset_data["url"],
+                    info_url=dataset_data["info_url"],
+                    source=dataset_data["source"],
+                    source_at=dataset_data["source_at"],
+                    embedding=embedding
+                )
+                session.add(dataset)
+                print(f"Added dataset: {dataset.title}")
+            else:
+                print(f"Failed to generate embedding for: {dataset_data['title']}")
         
         # Add reference queries
         print("\nAdding example reference queries...")
@@ -174,16 +195,19 @@ async def seed_data():
             combined_text = f"{query_data['title']} {query_data['description']} {query_data['sql_query']}"
             embedding = await get_embedding(combined_text)
             
-            # Create reference query record
-            ref_query = ReferenceQuery(
-                id=uuid.uuid4(),
-                title=query_data["title"],
-                description=query_data["description"],
-                sql_query=query_data["sql_query"],
-                embedding=embedding
-            )
-            session.add(ref_query)
-            print(f"Added reference query: {ref_query.title}")
+            if embedding:
+                # Create reference query record
+                ref_query = ReferenceQuery(
+                    id=uuid.uuid4(),
+                    title=query_data["title"],
+                    description=query_data["description"],
+                    sql_query=query_data["sql_query"],
+                    embedding=embedding
+                )
+                session.add(ref_query)
+                print(f"Added reference query: {ref_query.title}")
+            else:
+                print(f"Failed to generate embedding for query: {query_data['title']}")
         
         # Commit changes
         await session.commit()

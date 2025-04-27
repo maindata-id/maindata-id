@@ -40,6 +40,9 @@ class DatasetReference(BaseModel):
     title: str
     description: str
     url: Optional[str] = None
+    info_url: Optional[str] = None
+    source: str
+    source_at: datetime
     
     class Config:
         from_attributes = True

@@ -43,7 +43,7 @@ async def generate_sql_from_nl(
     
     # Create prompt with context
     prompt = f"""You are an AI data analyst specialized in generating SQL queries for Indonesian government data.
-Your task is to translate natural language questions into valid SQL queries.
+Your task is to translate natural language questions into valid SQL queries in DuckDB dialect.
 
 When generating SQL:
 1. Focus on clarity and correctness

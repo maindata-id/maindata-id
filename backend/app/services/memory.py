@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.db import ChatSession, ChatMessage
 from app.models.schema import MessageModel
 from typing import List, Optional
-import uuid
+from uuid import UUID
 
 async def create_session(db: AsyncSession, title: Optional[str] = None) -> ChatSession:
     """
@@ -15,23 +15,29 @@ async def create_session(db: AsyncSession, title: Optional[str] = None) -> ChatS
     await db.refresh(session)
     return session
 
-async def get_session(db: AsyncSession, session_id: uuid.UUID) -> Optional[ChatSession]:
+async def get_session(db: AsyncSession, session_id: UUID) -> Optional[ChatSession]:
     """
     Get a chat session by ID
     """
-    query = select(ChatSession).where(ChatSession.id == session_id)
-    result = await db.execute(query)
+    result = await db.execute(
+        select(ChatSession).where(ChatSession.id == session_id)
+    )
     return result.scalar_one_or_none()
 
 async def save_message(
     db: AsyncSession, 
-    session_id: uuid.UUID, 
+    session_id: UUID, 
     role: str, 
     content: str
 ) -> ChatMessage:
     """
     Save a message to the chat history
     """
+    # First verify the session exists
+    session = await get_session(db, session_id)
+    if not session:
+        raise ValueError(f"Session {session_id} not found")
+        
     message = ChatMessage(
         session_id=session_id,
         role=role,
@@ -44,17 +50,21 @@ async def save_message(
 
 async def get_session_history(
     db: AsyncSession, 
-    session_id: uuid.UUID
+    session_id: UUID
 ) -> List[MessageModel]:
     """
     Get all messages for a session ordered by creation time
     """
-    query = (
+    # First verify the session exists
+    session = await get_session(db, session_id)
+    if not session:
+        return []
+        
+    result = await db.execute(
         select(ChatMessage)
         .where(ChatMessage.session_id == session_id)
         .order_by(ChatMessage.created_at)
     )
-    result = await db.execute(query)
     messages = result.scalars().all()
     
     return [

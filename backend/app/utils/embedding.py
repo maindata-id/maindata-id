@@ -11,6 +11,9 @@ load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 genai.configure(api_key=GOOGLE_API_KEY)
 
+# Initialize embedding model
+embedding_model = 'models/embedding-001'
+
 async def get_embedding(text: str) -> Optional[List[float]]:
     """
     Get embedding vector for text using Gemini API
@@ -19,12 +22,15 @@ async def get_embedding(text: str) -> Optional[List[float]]:
         raise ValueError("Missing Google API key")
         
     try:
-        # Get embeddings using Gemini
-        embedding_model = genai.GenerativeModel('embedding-001')
-        result = embedding_model.embed_content(text)
+        # Get embeddings using Gemini's embedding model
+        result = genai.embed_content(
+            model=embedding_model,
+            content=text,
+            task_type="retrieval_document"
+        )
         
         # Return the embedding values
-        return result.values
+        return result["embedding"]
             
     except Exception as e:
         print(f"Error getting embedding: {str(e)}")

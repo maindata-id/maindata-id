@@ -104,13 +104,19 @@ cp .env.example .env
 # run db migrations
 uv run alembic upgrade head
 
+# seeding dataset catalog with dummy data
+uv run scripts/seed_example_data.py
+
+# fetching dataset catalog
+uv run scripts/fetch_datasets.py
+
 # for dev
 uv run fastapi dev --host 0.0.0.0
 # alternative if above doesn't work
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
 # for prod
-uvicorn main:app --host 0.0.0.0 --port 8000
+uv run uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
 ## 📬 Roadmap

@@ -5,8 +5,8 @@ from app.models.schema import GenerateSQLRequest, GenerateSQLResponse, ErrorResp
 from app.services.rag_dataset import get_relevant_datasets
 from app.services.rag_sql import get_relevant_queries
 from app.services.llm import generate_sql_from_nl
-from app.services.memory import save_message, get_session_history
-import uuid
+from app.services.memory import save_message, get_session_history, get_session
+from uuid import UUID
 
 router = APIRouter()
 
@@ -23,10 +23,13 @@ async def generate_sql(
     Generate SQL from natural language question, using RAG and chat history.
     """
     try:
+        # First verify session exists
+        session = await get_session(db, request.session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Chat session not found")
+            
         # Get chat history for context
         chat_history = await get_session_history(db, request.session_id)
-        if not chat_history:
-            raise HTTPException(status_code=404, detail="Chat session not found")
             
         # Get relevant datasets and example queries using RAG
         relevant_datasets = await get_relevant_datasets(db, request.question)
