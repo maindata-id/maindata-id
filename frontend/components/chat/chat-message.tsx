@@ -47,6 +47,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
   const hasExplanation = !!message.explanation
   const hasDatasets = message.datasets && message.datasets.length > 0
   const hasReferences = message.references && message.references.length > 0
+  const isStreaming = message.isStreaming
 
   return (
     <div className={cn("flex w-full", message.type === "user" ? "justify-end" : "justify-start")}>
@@ -82,11 +83,14 @@ export function ChatMessage({ message }: ChatMessageProps) {
                 <Skeleton className="h-4 w-[200px]" />
                 <Skeleton className="h-4 w-[150px]" />
               </div>
+            ) : isStreaming ? (
+              // For streaming messages, render the content directly (it's a React component)
+              message.content
             ) : (
               <p className={cn(message.isSQL ? "font-mono text-sm" : "")}>{message.content}</p>
             )}
 
-            <div className="text-xs opacity-70 mt-1">{format(message.timestamp, "HH:mm")}</div>
+            {!isStreaming && <div className="text-xs opacity-70 mt-1">{format(message.timestamp, "HH:mm")}</div>}
           </div>
 
           {/* Explanation from LLM */}

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { ChatMessage, type MessageType } from "./chat-message"
 import { ChatInput } from "./chat-input"
 import { executeQuery, getTables, type QueryResult } from "@/lib/duckdb"
-import { translateToSql, setCurrentSessionId } from "@/lib/llm"
+import { setCurrentSessionId } from "@/lib/llm"
 import { DuckDBStatus } from "./duckdb-status"
 import { useDuckDB } from "@/components/duckdb-provider"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -14,6 +14,7 @@ import type { Dataset, QueryReference } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
 import { ApiSettingsDialog } from "./api-settings-dialog"
 import { ApiStatus } from "./api-status"
+import { StreamingSqlGeneration } from "./streaming-sql-generation"
 
 export interface Message {
   id: string
@@ -29,6 +30,7 @@ export interface Message {
   explanation?: string
   datasets?: Dataset[]
   references?: QueryReference[]
+  isStreaming?: boolean
 }
 
 interface ChatContainerProps {
@@ -153,42 +155,32 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
 
     setMessages((prev) => [...prev, userMessage])
 
+    if (isSQL) {
+      // For SQL queries, use the existing flow
+      handleSqlQuery(content)
+    } else {
+      // For natural language, use the streaming flow
+      handleNaturalLanguageQuery(content)
+    }
+  }
+
+  const handleSqlQuery = async (sql: string) => {
     // Add loading message
     const loadingMessageId = `loading-${Date.now()}`
     const loadingMessage: Message = {
       id: loadingMessageId,
       type: "system",
-      content: "Processing your query...",
+      content: "Processing your SQL query...",
       timestamp: new Date(),
-      isSQL: false,
+      isSQL: true,
       isLoading: true,
     }
 
     setMessages((prev) => [...prev, loadingMessage])
 
     try {
-      let sqlQuery = content
-      let datasetName = ""
-      let queryResults: QueryResult[] = []
-      let explanation: string | undefined
-      let datasets: Dataset[] | undefined
-      let references: QueryReference[] | undefined
-
-      // If not SQL, translate to SQL first
-      if (!isSQL) {
-        const translation = await translateToSql(content)
-        sqlQuery = translation.sql
-        datasetName = translation.datasetName
-        explanation = translation.explanation
-        datasets = translation.datasets
-        references = translation.references
-
-        // Execute the translated SQL query
-        queryResults = await executeQuery(sqlQuery)
-      } else {
-        // Execute the SQL query directly
-        queryResults = await executeQuery(content)
-      }
+      // Execute the SQL query directly
+      const queryResults = await executeQuery(sql)
 
       // Remove loading message
       setMessages((prev) => prev.filter((msg) => msg.id !== loadingMessageId))
@@ -208,9 +200,7 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
 
       // Generate a summary of what happened
       let resultSummary = ""
-      if (!isSQL) {
-        resultSummary = `I've translated your question to SQL and executed it.`
-      } else if (queryResults.length === 1) {
+      if (queryResults.length === 1) {
         resultSummary = getQueryDescription(queryResults[0].sql)
       } else {
         resultSummary = `Executed ${queryResults.length} SQL statements.`
@@ -224,11 +214,6 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
         timestamp: new Date(),
         isSQL: false,
         queryResults,
-        sqlQuery: !isSQL ? sqlQuery : undefined,
-        datasetName,
-        explanation,
-        datasets,
-        references,
       }
 
       setMessages((prev) => [...prev, resultMessage])
@@ -240,7 +225,7 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
       const errorMessage: Message = {
         id: `error-${Date.now()}`,
         type: "system",
-        content: "Error executing query",
+        content: "Error executing SQL query",
         timestamp: new Date(),
         isSQL: false,
         error: err.message,
@@ -248,6 +233,95 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
 
       setMessages((prev) => [...prev, errorMessage])
     }
+  }
+
+  const handleNaturalLanguageQuery = (query: string) => {
+    // Add streaming message
+    const streamingMessageId = `streaming-${Date.now()}`
+    const streamingMessage: Message = {
+      id: streamingMessageId,
+      type: "system",
+      content: "Generating SQL from your question...",
+      timestamp: new Date(),
+      isSQL: false,
+      isStreaming: true,
+    }
+
+    setMessages((prev) => [...prev, streamingMessage])
+
+    // Function to handle completion of SQL generation
+    const handleStreamingComplete = async (sql: string, explanation: string) => {
+      try {
+        // Execute the generated SQL
+        const queryResults = await executeQuery(sql)
+
+        // Remove streaming message
+        setMessages((prev) => prev.filter((msg) => msg.id !== streamingMessageId))
+
+        // Add result message
+        const resultMessage: Message = {
+          id: `result-${Date.now()}`,
+          type: "system",
+          content: "I've translated your question to SQL and executed it.",
+          timestamp: new Date(),
+          isSQL: false,
+          queryResults,
+          sqlQuery: sql,
+          explanation,
+          datasetName: "Query Result", // This would ideally be extracted from the explanation
+        }
+
+        setMessages((prev) => [...prev, resultMessage])
+      } catch (err: any) {
+        // Remove streaming message
+        setMessages((prev) => prev.filter((msg) => msg.id !== streamingMessageId))
+
+        // Add error message
+        const errorMessage: Message = {
+          id: `error-${Date.now()}`,
+          type: "system",
+          content: "Error executing the generated SQL",
+          timestamp: new Date(),
+          isSQL: false,
+          error: err.message,
+          sqlQuery: sql,
+          explanation,
+        }
+
+        setMessages((prev) => [...prev, errorMessage])
+      }
+    }
+
+    // Function to handle cancellation
+    const handleCancel = () => {
+      // Remove streaming message
+      setMessages((prev) => prev.filter((msg) => msg.id !== streamingMessageId))
+
+      // Add cancelled message
+      const cancelledMessage: Message = {
+        id: `cancelled-${Date.now()}`,
+        type: "system",
+        content: "SQL generation cancelled.",
+        timestamp: new Date(),
+        isSQL: false,
+      }
+
+      setMessages((prev) => [...prev, cancelledMessage])
+    }
+
+    // Update the streaming message with the component
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === streamingMessageId
+          ? {
+              ...msg,
+              content: (
+                <StreamingSqlGeneration query={query} onComplete={handleStreamingComplete} onCancel={handleCancel} />
+              ) as unknown as string, // Type hack for the component
+            }
+          : msg,
+      ),
+    )
   }
 
   return (

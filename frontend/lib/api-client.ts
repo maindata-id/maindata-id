@@ -108,6 +108,45 @@ export async function generateSQL(sessionId: string, question: string): Promise<
 }
 
 /**
+ * Stream SQL generation from natural language
+ * Returns a ReadableStream that emits explanation and SQL as they're generated
+ */
+export async function streamGenerateSQL(sessionId: string, question: string): Promise<ReadableStream<Uint8Array>> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/generate-sql-stream`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        session_id: sessionId,
+        question,
+      }),
+    })
+
+    if (!response.ok) {
+      let errorMessage = `API error: ${response.status}`
+
+      try {
+        const errorData = await response.json()
+        errorMessage = errorData.detail || errorMessage
+      } catch (e) {
+        // If we can't parse the error as JSON, use the status text
+        errorMessage = `API error: ${response.statusText || response.status}`
+      }
+
+      throw new Error(errorMessage)
+    }
+
+    return response.body!
+  } catch (error) {
+    console.error("Error streaming SQL generation:", error)
+    throw error
+  }
+}
+
+/**
  * Get session data
  */
 export async function getSession(sessionId: string): Promise<any> {
