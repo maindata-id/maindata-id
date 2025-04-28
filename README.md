@@ -121,8 +121,10 @@ uv run uvicorn main:app --host 0.0.0.0 --port 8000
 
 ## 📬 Roadmap
 
-- [ ] MVP with NL → SQL + DuckDB
-- [ ] RAG-enhanced query understanding
+- [x] MVP with NL → SQL + DuckDB
+- [x] RAG-enhanced query understanding
+- [ ] stream based response to frontend
+- [ ] basic user registration & login, and history management
 - [ ] Chart suggestion + auto-viz
 - [ ] One-click CSV upload for user datasets
 - [ ] Dataset versioning and provenance info
