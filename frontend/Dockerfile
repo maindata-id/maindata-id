@@ -1,4 +1,4 @@
-FROM node:22-alpine
+FROM node:23-alpine
 
 WORKDIR /app
 
@@ -9,7 +9,7 @@ RUN corepack enable pnpm
 COPY package.json pnpm-lock.yaml ./
 
 # Install dependencies
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --prod --frozen-lockfile
 
 # Copy the rest of the application
 COPY . .
