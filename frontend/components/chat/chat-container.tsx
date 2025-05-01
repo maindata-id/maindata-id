@@ -12,7 +12,6 @@ import { Database, Settings } from "lucide-react"
 import { getQueryDescription } from "@/lib/sql-parser"
 import type { Dataset, QueryReference } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
-import { ApiSettingsDialog } from "./api-settings-dialog"
 import { ApiStatus } from "./api-status"
 import { StreamingSqlGeneration } from "./streaming-sql-generation"
 
@@ -43,7 +42,6 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
   const [messages, setMessages] = useState<Message[]>([])
   const [tables, setTables] = useState<string[]>([])
   const [tablesLoaded, setTablesLoaded] = useState(false)
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [initialQueryProcessed, setInitialQueryProcessed] = useState(false)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const { isReady: isDuckDBReady } = useDuckDB()
@@ -368,7 +366,6 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
         <ChatInput onSendMessage={handleSendMessage} disabled={!isDuckDBReady} />
       </div>
 
-      <ApiSettingsDialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
     </div>
   )
 }
