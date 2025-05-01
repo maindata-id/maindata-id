@@ -27,26 +27,6 @@ const nextConfig = {
       },
     ];
   },
-  webpack: (config, { isServer }) => {
-    // WebAssembly support
-    config.experiments = { ...config.experiments, asyncWebAssembly: true };
-    
-    // Add this to properly handle the DuckDB WASM modules
-    config.module.rules.push({
-      test: /\.wasm$/,
-      type: "asset/resource",
-    });
-    
-    // Add this for CJS compatibility
-    config.resolve.fallback = {
-      ...config.resolve.fallback,
-      fs: false,
-      path: false,
-      crypto: false,
-    };
-    
-    return config;
-  },
 };
 
 export default nextConfig;

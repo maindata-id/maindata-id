@@ -1,9 +1,10 @@
 "use client"
 
 import type React from "react"
-
 import { createContext, useContext, useEffect, useState } from "react"
-import { initDuckDB } from "@/lib/duckdb"
+
+// Remove direct import of DuckDB
+// import { initDuckDB } from "@/lib/duckdb"
 
 type DuckDBContextType = {
   isLoading: boolean
@@ -50,6 +51,9 @@ export default function DuckDBProvider({ children }: { children: React.ReactNode
             }
           }
         }, 500)
+
+        // Dynamically import DuckDB only on the client side
+        const { initDuckDB } = await import("@/lib/duckdb")
 
         // Set a timeout to prevent hanging if initialization takes too long
         const timeoutPromise = new Promise<never>((_, reject) => {

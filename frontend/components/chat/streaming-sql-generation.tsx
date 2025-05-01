@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import { Loader2 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { streamTranslateToSql } from "@/lib/llm"
 
 interface StreamingSqlGenerationProps {
   query: string
@@ -15,22 +14,69 @@ export function StreamingSqlGeneration({ query, onComplete, onCancel }: Streamin
   const [explanation, setExplanation] = useState<string>("")
   const [sql, setSql] = useState<string>("")
   const [isComplete, setIsComplete] = useState<boolean>(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Helper function to clean SQL for display
+  const cleanSqlForDisplay = (sql: string): string => {
+    // Remove any "===" at the beginning of the SQL
+    let cleanedSql = sql.replace(/^===+\s*/, "")
+
+    // Remove any lines that start with "===" anywhere in the SQL
+    cleanedSql = cleanedSql
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("==="))
+      .join("\n")
+
+    return cleanedSql
+  }
 
   useEffect(() => {
-    // Start streaming
-    const cancelStream = streamTranslateToSql(query, (data) => {
-      setExplanation(data.explanation)
-      setSql(data.sql)
+    // Only run in the browser
+    if (typeof window === "undefined") return
 
-      if (data.isComplete) {
-        setIsComplete(true)
-        onComplete(data.sql, data.explanation)
+    let isMounted = true
+
+    // Start streaming
+    const startStreaming = async () => {
+      try {
+        // Dynamically import the streaming function
+        const { streamTranslateToSql } = await import("@/lib/llm")
+
+        const cancelStream = streamTranslateToSql(query, (data) => {
+          if (!isMounted) return
+
+          setExplanation(data.explanation)
+
+          // Clean SQL before setting it for display
+          const cleanedSql = cleanSqlForDisplay(data.sql)
+          setSql(cleanedSql)
+
+          if (data.isComplete) {
+            setIsComplete(true)
+            // Pass the cleaned SQL to the completion handler
+            onComplete(cleanedSql, data.explanation)
+          }
+        })
+
+        return cancelStream
+      } catch (error) {
+        console.error("Error starting stream:", error)
+        if (isMounted) {
+          const errorMessage = error instanceof Error ? error.message : "Unknown error"
+          setError(errorMessage)
+          setExplanation(`Error: ${errorMessage}`)
+          setIsComplete(true)
+        }
+        return () => {}
       }
-    })
+    }
+
+    const cancelPromise = startStreaming()
 
     // Cleanup function to cancel the stream
     return () => {
-      cancelStream()
+      isMounted = false
+      cancelPromise.then((cancel) => cancel())
     }
   }, [query, onComplete])
 
@@ -39,7 +85,7 @@ export function StreamingSqlGeneration({ query, onComplete, onCancel }: Streamin
       <CardHeader className="py-3">
         <CardTitle className="text-sm font-medium flex items-center gap-2">
           {!isComplete && <Loader2 className="h-4 w-4 animate-spin" />}
-          Generating SQL...
+          {error ? "Error Generating SQL" : "Generating SQL..."}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -66,4 +112,3 @@ export function StreamingSqlGeneration({ query, onComplete, onCancel }: Streamin
     </Card>
   )
 }
-

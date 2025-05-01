@@ -1,4 +1,5 @@
-import { generateSQL, streamGenerateSQL, startSession, type Dataset, type QueryReference } from "./api-client"
+import { startSession, type Dataset, type QueryReference } from "./api-client"
+import { debugLogSSE } from "./debug-utils"
 
 // Store the session ID
 let currentSessionId: string | null = null
@@ -36,68 +37,160 @@ export async function ensureSession(): Promise<string> {
  * SQL Queries
  */
 export function parseStreamingResponse(text: string): { explanation: string; sql: string } {
+  // First, check if the text starts with "===" and remove it if present
+  let cleanedText = text
+  if (cleanedText.startsWith("===")) {
+    // Find the first newline after the "===" and remove everything before it
+    const firstNewline = cleanedText.indexOf("\n")
+    if (firstNewline !== -1) {
+      cleanedText = cleanedText.substring(firstNewline + 1)
+    } else {
+      // If there's no newline, just remove the "==="
+      cleanedText = cleanedText.replace(/^===+/, "")
+    }
+  }
+
   const separator = "==========="
-  const separatorIndex = text.indexOf(separator)
+  const separatorIndex = cleanedText.indexOf(separator)
 
   if (separatorIndex === -1) {
     // If separator not found, everything is explanation so far
     return {
-      explanation: text.trim(),
+      explanation: cleanedText.trim(),
       sql: "",
     }
   }
 
   // Split the text into explanation and SQL
-  const explanation = text.substring(0, separatorIndex).trim()
-  const sql = text.substring(separatorIndex + separator.length).trim()
+  const explanation = cleanedText.substring(0, separatorIndex).trim()
+
+  // Get the SQL part and ensure it doesn't start with "===" or similar
+  let sql = cleanedText.substring(separatorIndex + separator.length).trim()
+
+  // Remove any "===" at the beginning of the SQL
+  sql = sql.replace(/^===+/, "").trim()
 
   return { explanation, sql }
+}
+
+/**
+ * Process SSE data by properly handling the event format
+ * SSE format:
+ * data: line1\n
+ * data: line2\n
+ * \n (empty line marks end of event)
+ */
+function processSSEData(data: string): string {
+  // For debugging
+  if (process.env.NODE_ENV === "development") {
+    debugLogSSE(data, "Raw SSE Data")
+  }
+
+  // Initialize result
+  let result = ""
+
+  // Split by double newlines to separate events
+  const events = data.split(/\n\n+/)
+
+  for (const event of events) {
+    if (!event.trim()) continue
+
+    // Process each line in the event
+    const lines = event.split(/\n/)
+    for (const line of lines) {
+      // Skip empty lines
+      if (!line.trim()) continue
+
+      // Check if line starts with "data:" and extract the content
+      if (line.startsWith("data:")) {
+        // Extract content after "data:" prefix, handling potential space after colon
+        const content = line.substring(5).trimStart()
+
+        // Skip lines that are just "===" markers
+        if (content.trim() === "===") continue
+
+        result += content + "\n"
+      } else {
+        // If it's not a data line but has content, include it anyway
+        // Skip lines that are just "===" markers
+        if (line.trim() === "===") continue
+
+        result += line + "\n"
+      }
+    }
+  }
+
+  const processed = result.trim()
+
+  // For debugging
+  if (process.env.NODE_ENV === "development") {
+    debugLogSSE(processed, "Processed SSE Data")
+  }
+
+  return processed
 }
 
 /**
  * Stream translation from natural language to SQL
  * Returns a function that can be used to subscribe to updates
  */
-export function streamTranslateToSql(
+export async function streamTranslateToSql(
   naturalLanguageQuery: string,
   onUpdate: (data: { explanation: string; sql: string; isComplete: boolean }) => void,
-): () => void {
+): Promise<() => void> {
+  // Only run in the browser
+  if (typeof window === "undefined") {
+    onUpdate({
+      explanation: "Error: Streaming is only available in the browser",
+      sql: "",
+      isComplete: true,
+    })
+    return () => {}
+  }
+
   let isCancelled = false
   const decoder = new TextDecoder()
-  let buffer = ""(
-    // Start the streaming process
-    async () => {
-      try {
-        // Ensure we have a session
-        const sessionId = await ensureSession()
+  let buffer = ""
 
-        // Get the stream
-        const stream = await streamGenerateSQL(sessionId, naturalLanguageQuery)
-        const reader = stream.getReader()
+  try {
+    // Ensure we have a session
+    const sessionId = await ensureSession()
 
-        // Process the stream
-        while (!isCancelled) {
-          const { done, value } = await reader.read()
+    // Dynamically import the API client
+    const { streamGenerateSQL } = await import("./api-client")
 
-          if (done) {
-            // Stream is complete, send final update
-            const { explanation, sql } = parseStreamingResponse(buffer)
-            onUpdate({ explanation, sql, isComplete: true })
-            break
-          }
+    // Get the stream
+    const stream = await streamGenerateSQL(sessionId, naturalLanguageQuery)
+    const reader = stream.getReader()
 
-          // Decode the chunk and add to buffer
-          const chunk = decoder.decode(value, { stream: true })
-          buffer += chunk
+    // Process the stream
+    const processStream = async () => {
+      while (!isCancelled) {
+        const { done, value } = await reader.read()
 
-          // Parse and send update
-          const { explanation, sql } = parseStreamingResponse(buffer)
-          onUpdate({ explanation, sql, isComplete: false })
+        if (done) {
+          // Stream is complete, send final update
+          const processedBuffer = processSSEData(buffer)
+          const { explanation, sql } = parseStreamingResponse(processedBuffer)
+          onUpdate({ explanation, sql, isComplete: true })
+          break
         }
-      } catch (error) {
-        console.error("Error streaming translation:", error)
 
-        // Send error as explanation
+        // Decode the chunk and add to buffer
+        const chunk = decoder.decode(value, { stream: true })
+        buffer += chunk
+
+        // Process SSE data, then parse and send update
+        const processedBuffer = processSSEData(buffer)
+        const { explanation, sql } = parseStreamingResponse(processedBuffer)
+        onUpdate({ explanation, sql, isComplete: false })
+      }
+    }
+
+    // Start processing the stream
+    processStream().catch((error) => {
+      console.error("Error processing stream:", error)
+      if (!isCancelled) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
         onUpdate({
           explanation: `Error: ${errorMessage}`,
@@ -105,12 +198,26 @@ export function streamTranslateToSql(
           isComplete: true,
         })
       }
-    },
-  )()
+    })
 
-  // Return cancel function
-  return () => {
-    isCancelled = true
+    // Return cancel function
+    return () => {
+      isCancelled = true
+      reader.cancel().catch(console.error)
+    }
+  } catch (error) {
+    console.error("Error streaming translation:", error)
+
+    // Send error as explanation
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
+    onUpdate({
+      explanation: `Error: ${errorMessage}`,
+      sql: `SELECT 'API Error: ${errorMessage.replace(/'/g, "''")}' as error_message`,
+      isComplete: true,
+    })
+
+    // Return empty cancel function
+    return () => {}
   }
 }
 
@@ -129,6 +236,9 @@ export async function translateToSql(naturalLanguageQuery: string): Promise<{
   try {
     // Ensure we have a session
     const sessionId = await ensureSession()
+
+    // Dynamically import the API client
+    const { generateSQL } = await import("./api-client")
 
     // Call the API to generate SQL
     const result = await generateSQL(sessionId, naturalLanguageQuery)

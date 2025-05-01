@@ -117,7 +117,9 @@ export async function streamGenerateSQL(sessionId: string, question: string): Pr
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Accept: "application/json",
+        Accept: "text/event-stream", // Explicitly request SSE format
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
       },
       body: JSON.stringify({
         session_id: sessionId,
@@ -139,7 +141,12 @@ export async function streamGenerateSQL(sessionId: string, question: string): Pr
       throw new Error(errorMessage)
     }
 
-    return response.body!
+    // Check if we got a proper stream
+    if (!response.body) {
+      throw new Error("Response body is null")
+    }
+
+    return response.body
   } catch (error) {
     console.error("Error streaming SQL generation:", error)
     throw error

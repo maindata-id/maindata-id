@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useEffect, useRef, useState } from "react"
 import { ChatMessage, type MessageType } from "./chat-message"
 import { ChatInput } from "./chat-input"
@@ -12,13 +14,14 @@ import { Database, Settings } from "lucide-react"
 import { getQueryDescription } from "@/lib/sql-parser"
 import type { Dataset, QueryReference } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
+import { ApiSettingsDialog } from "./api-settings-dialog"
 import { ApiStatus } from "./api-status"
 import { StreamingSqlGeneration } from "./streaming-sql-generation"
 
 export interface Message {
   id: string
   type: MessageType
-  content: string
+  content: string | React.ReactNode
   timestamp: Date
   isSQL: boolean
   queryResults?: QueryResult[]
@@ -42,6 +45,7 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
   const [messages, setMessages] = useState<Message[]>([])
   const [tables, setTables] = useState<string[]>([])
   const [tablesLoaded, setTablesLoaded] = useState(false)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [initialQueryProcessed, setInitialQueryProcessed] = useState(false)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const { isReady: isDuckDBReady } = useDuckDB()
@@ -239,87 +243,103 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
     const streamingMessage: Message = {
       id: streamingMessageId,
       type: "system",
-      content: "Generating SQL from your question...",
+      content: (
+        <StreamingSqlGeneration
+          query={query}
+          onComplete={handleStreamingComplete}
+          onCancel={() => handleCancel(streamingMessageId)}
+        />
+      ),
       timestamp: new Date(),
       isSQL: false,
       isStreaming: true,
     }
 
     setMessages((prev) => [...prev, streamingMessage])
+  }
 
-    // Function to handle completion of SQL generation
-    const handleStreamingComplete = async (sql: string, explanation: string) => {
-      try {
-        // Execute the generated SQL
-        const queryResults = await executeQuery(sql)
+  // Function to handle completion of SQL generation
+  const handleStreamingComplete = async (sql: string, explanation: string) => {
+    try {
+      // Validate SQL before executing
+      const cleanedSql = validateAndCleanSql(sql)
 
-        // Remove streaming message
-        setMessages((prev) => prev.filter((msg) => msg.id !== streamingMessageId))
+      // Execute the generated SQL
+      const queryResults = await executeQuery(cleanedSql)
 
-        // Add result message
-        const resultMessage: Message = {
-          id: `result-${Date.now()}`,
-          type: "system",
-          content: "I've translated your question to SQL and executed it.",
-          timestamp: new Date(),
-          isSQL: false,
-          queryResults,
-          sqlQuery: sql,
-          explanation,
-          datasetName: "Query Result", // This would ideally be extracted from the explanation
-        }
-
-        setMessages((prev) => [...prev, resultMessage])
-      } catch (err: any) {
-        // Remove streaming message
-        setMessages((prev) => prev.filter((msg) => msg.id !== streamingMessageId))
-
-        // Add error message
-        const errorMessage: Message = {
-          id: `error-${Date.now()}`,
-          type: "system",
-          content: "Error executing the generated SQL",
-          timestamp: new Date(),
-          isSQL: false,
-          error: err.message,
-          sqlQuery: sql,
-          explanation,
-        }
-
-        setMessages((prev) => [...prev, errorMessage])
-      }
-    }
-
-    // Function to handle cancellation
-    const handleCancel = () => {
-      // Remove streaming message
-      setMessages((prev) => prev.filter((msg) => msg.id !== streamingMessageId))
-
-      // Add cancelled message
-      const cancelledMessage: Message = {
-        id: `cancelled-${Date.now()}`,
+      // Add result message
+      const resultMessage: Message = {
+        id: `result-${Date.now()}`,
         type: "system",
-        content: "SQL generation cancelled.",
+        content: "I've translated your question to SQL and executed it.",
         timestamp: new Date(),
         isSQL: false,
+        queryResults,
+        sqlQuery: cleanedSql,
+        explanation,
+        datasetName: "Query Result", // This would ideally be extracted from the explanation
       }
 
-      setMessages((prev) => [...prev, cancelledMessage])
+      setMessages((prev) => {
+        // Filter out streaming messages
+        const filteredMessages = prev.filter((msg) => !msg.isStreaming)
+        return [...filteredMessages, resultMessage]
+      })
+    } catch (err: any) {
+      // Add error message
+      const errorMessage: Message = {
+        id: `error-${Date.now()}`,
+        type: "system",
+        content: "Error executing the generated SQL",
+        timestamp: new Date(),
+        isSQL: false,
+        error: err.message,
+        sqlQuery: sql,
+        explanation,
+      }
+
+      setMessages((prev) => {
+        // Filter out streaming messages
+        const filteredMessages = prev.filter((msg) => !msg.isStreaming)
+        return [...filteredMessages, errorMessage]
+      })
+    }
+  }
+
+  // Helper function to validate and clean SQL before execution
+  const validateAndCleanSql = (sql: string): string => {
+    // Remove any "===" at the beginning of the SQL
+    let cleanedSql = sql.replace(/^===+\s*/, "")
+
+    // Remove any lines that start with "===" anywhere in the SQL
+    cleanedSql = cleanedSql
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("==="))
+      .join("\n")
+
+    // If SQL is empty after cleaning, throw an error
+    if (!cleanedSql.trim()) {
+      throw new Error("Generated SQL is empty after cleaning")
     }
 
-    // Update the streaming message with the component
-    setMessages((prev) =>
-      prev.map((msg) =>
-        msg.id === streamingMessageId
-          ? {
-              ...msg,
-              content: (
-                <StreamingSqlGeneration query={query} onComplete={handleStreamingComplete} onCancel={handleCancel} />
-              ) as unknown as string, // Type hack for the component
-            }
-          : msg,
-      ),
-    )
+    return cleanedSql
+  }
+
+  // Function to handle cancellation
+  const handleCancel = (streamingMessageId: string) => {
+    // Remove streaming message
+    setMessages((prev) => prev.filter((msg) => msg.id !== streamingMessageId))
+
+    // Add cancelled message
+    const cancelledMessage: Message = {
+      id: `cancelled-${Date.now()}`,
+      type: "system",
+      content: "SQL generation cancelled.",
+      timestamp: new Date(),
+      isSQL: false,
+    }
+
+    setMessages((prev) => [...prev, cancelledMessage])
   }
 
   return (
@@ -366,6 +386,7 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
         <ChatInput onSendMessage={handleSendMessage} disabled={!isDuckDBReady} />
       </div>
 
+      <ApiSettingsDialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
     </div>
   )
 }

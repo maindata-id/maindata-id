@@ -69,6 +69,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
             className={cn(
               "rounded-lg px-4 py-2 max-w-full",
               message.type === "user" ? "bg-primary text-primary-foreground" : "bg-muted",
+              isStreaming ? "w-full" : "",
             )}
           >
             {message.isSQL && (

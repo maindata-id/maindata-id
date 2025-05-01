@@ -1,14 +1,21 @@
-import * as duckdb from "@duckdb/duckdb-wasm"
-import { splitSqlQueries, isDdlStatement, isDataModifyingStatement } from "./sql-parser"
+// Add a check to ensure this only runs on the client side
+const isBrowser = typeof window !== "undefined"
+
+// Import DuckDB only if in browser
+let duckdb: typeof import("@duckdb/duckdb-wasm") | null = null
 
 // DuckDB instance
-let db: duckdb.AsyncDuckDB | null = null
-let conn: duckdb.AsyncDuckDBConnection | null = null
+let db: any | null = null
+let conn: any | null = null
 let isInitializing = false
 let initPromise: Promise<void> | null = null
 
 // Initialize DuckDB
 export async function initDuckDB(): Promise<void> {
+  if (!isBrowser) {
+    throw new Error("DuckDB can only be initialized in the browser")
+  }
+
   if (db !== null) return // Already initialized
   if (initPromise) return initPromise // Already initializing
 
@@ -16,6 +23,9 @@ export async function initDuckDB(): Promise<void> {
 
   initPromise = new Promise(async (resolve, reject) => {
     try {
+      // Dynamically import DuckDB
+      duckdb = await import("@duckdb/duckdb-wasm")
+
       // Create a logger
       const logger = new duckdb.ConsoleLogger()
 
@@ -70,6 +80,10 @@ export async function initDuckDB(): Promise<void> {
 
 // Execute a single SQL query
 export async function executeSingleQuery(sql: string): Promise<any[]> {
+  if (!isBrowser) {
+    throw new Error("DuckDB can only be used in the browser")
+  }
+
   if (!conn) {
     throw new Error("DuckDB connection not available")
   }
@@ -95,7 +109,23 @@ export interface QueryResult {
 
 // Execute a SQL query (which may contain multiple statements)
 export async function executeQuery(sql: string): Promise<QueryResult[]> {
+  if (!isBrowser) {
+    return [
+      {
+        sql,
+        results: [],
+        isError: true,
+        errorMessage: "DuckDB can only be used in the browser",
+        isDdl: false,
+        isDataModifying: false,
+      },
+    ]
+  }
+
   try {
+    // Import the SQL parser only when needed
+    const { splitSqlQueries, isDdlStatement, isDataModifyingStatement } = await import("./sql-parser")
+
     // Initialize DuckDB if not already initialized
     if (!db || !conn) {
       try {
@@ -160,6 +190,10 @@ export async function executeQuery(sql: string): Promise<QueryResult[]> {
 
 // Get available tables
 export async function getTables(): Promise<string[]> {
+  if (!isBrowser) {
+    return []
+  }
+
   try {
     if (!db || !conn) {
       await initDuckDB()
@@ -184,6 +218,10 @@ export async function getTables(): Promise<string[]> {
 
 // Get schema for a specific table
 export async function getTableSchema(tableName: string): Promise<{ name: string; type: string }[]> {
+  if (!isBrowser) {
+    return []
+  }
+
   try {
     if (!db || !conn) {
       await initDuckDB()
