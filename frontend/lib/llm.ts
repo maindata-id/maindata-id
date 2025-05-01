@@ -37,6 +37,7 @@ export async function ensureSession(): Promise<string> {
  * SQL Queries
  */
 export function parseStreamingResponse(text: string): { explanation: string; sql: string } {
+  /*
   // First, check if the text starts with "===" and remove it if present
   let cleanedText = text
   if (cleanedText.startsWith("===")) {
@@ -69,6 +70,31 @@ export function parseStreamingResponse(text: string): { explanation: string; sql
 
   // Remove any "===" at the beginning of the SQL
   sql = sql.replace(/^===+/, "").trim()
+  */
+
+  /**
+   * alternative code by claude
+   * Splits a string into two parts at the first occurrence of at least 5 consecutive equal signs (=)
+   * @param {string} inputString - The string to split
+   * @returns {Array} An array containing the two parts of the split string, or the original string in the first element if no separator is found
+   */
+  // Create a regular expression to match 5 or more consecutive equal signs
+  const separatorRegex = /={5,}/;
+  
+  // Find the match in the string
+  const match = text.match(separatorRegex);
+  
+  // If no match is found, return the original string in an array
+  if (!match) {
+    return { explanation: text.trim(), sql: "" };
+  }
+  
+  // Find the index where the separator begins
+  const separatorIndex = match.index;
+  
+  // Split the string into two parts
+  const explanation = text.substring(0, separatorIndex).trim();
+  const sql = text.substring(separatorIndex + match[0].length).trim();
 
   return { explanation, sql }
 }
@@ -76,8 +102,8 @@ export function parseStreamingResponse(text: string): { explanation: string; sql
 /**
  * Process SSE data by properly handling the event format
  * SSE format:
- * data: line1\n
- * data: line2\n
+ * data: line1\n\n
+ * data: line2\n\n
  * \n (empty line marks end of event)
  */
 function processSSEData(data: string): string {
@@ -86,41 +112,8 @@ function processSSEData(data: string): string {
     debugLogSSE(data, "Raw SSE Data")
   }
 
-  // Initialize result
-  let result = ""
-
   // Split by double newlines to separate events
-  const events = data.split(/\n\n+/)
-
-  for (const event of events) {
-    if (!event.trim()) continue
-
-    // Process each line in the event
-    const lines = event.split(/\n/)
-    for (const line of lines) {
-      // Skip empty lines
-      if (!line.trim()) continue
-
-      // Check if line starts with "data:" and extract the content
-      if (line.startsWith("data:")) {
-        // Extract content after "data:" prefix, handling potential space after colon
-        const content = line.substring(5).trimStart()
-
-        // Skip lines that are just "===" markers
-        if (content.trim() === "===") continue
-
-        result += content + "\n"
-      } else {
-        // If it's not a data line but has content, include it anyway
-        // Skip lines that are just "===" markers
-        if (line.trim() === "===") continue
-
-        result += line + "\n"
-      }
-    }
-  }
-
-  const processed = result.trim()
+  const processed = data.split(/\n\ndata: +/).join('').trim()
 
   // For debugging
   if (process.env.NODE_ENV === "development") {

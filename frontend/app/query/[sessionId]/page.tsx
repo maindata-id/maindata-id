@@ -6,10 +6,11 @@ import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ChatContainer } from "@/components/chat/chat-container"
+import * as React from 'react'
 
 export default function QueryPage({ params }: { params: { sessionId: string } }) {
   const searchParams = useSearchParams()
-  const sessionId = params.sessionId
+  const { sessionId } = React.use(params)
   const datasetParam = searchParams.get("dataset") || ""
   const [initialQuery, setInitialQuery] = useState<string | null>(null)
 

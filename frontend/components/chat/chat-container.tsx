@@ -384,8 +384,6 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
       <div className="border-t p-4">
         <ChatInput onSendMessage={handleSendMessage} disabled={!isDuckDBReady} />
       </div>
-
-      <ApiSettingsDialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
     </div>
   )
 }
