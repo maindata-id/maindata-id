@@ -113,7 +113,10 @@ function processSSEData(data: string): string {
   }
 
   // Split by double newlines to separate events
-  const processed = data.split(/\n\ndata: +/).join('').trim()
+  const processed = data
+    .replaceAll(/\n\ndata: +/g, '') // split based on SSE format
+    .replace(/^data: /, '') // cleanup additional data in the beginning
+    .trim()
 
   // For debugging
   if (process.env.NODE_ENV === "development") {

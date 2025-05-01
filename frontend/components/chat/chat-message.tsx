@@ -110,7 +110,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
               </div>
               <CollapsibleContent>
                 <div className="p-4 text-sm">
-                  <p>{message.explanation}</p>
+                  <pre className="text-wrap bg-muted px-1.5 py-0.5 rounded">{message.explanation}</pre>
 
                   {/* Datasets used */}
                   {hasDatasets && (
