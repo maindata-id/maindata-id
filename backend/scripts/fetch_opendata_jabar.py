@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy import func, select
 from dotenv import load_dotenv
 import uuid
 from typing import List, Dict, Any
@@ -33,15 +34,25 @@ AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=F
 # API Configuration
 JABAR_API_BASE = "https://data.jabarprov.go.id/api-backend"
 DATASETS_PER_PAGE = 100
+HTTP_TIMEOUT = os.getenv("HTTP_TIMEOUT", 20)
 
-async def fetch_datasets_page(client: httpx.AsyncClient, page: int = 0) -> Dict[str, Any]:
+async def get_dataset_count() -> int:
+    """
+    Get the count of existing datasets in the database
+    """
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(func.count()).select_from(DatasetCatalog))
+        count = result.scalar()
+        return count or 0
+
+async def fetch_datasets_page(client: httpx.AsyncClient, page: int = 0, base_skip: int = 0) -> Dict[str, Any]:
     """
     Fetch a page of datasets from the Jabar OpenData API
     """
     params = {
         "limit": DATASETS_PER_PAGE,
-        "skip": page * DATASETS_PER_PAGE,
-        "sort": "datetime:asc"
+        "skip": base_skip + (page * DATASETS_PER_PAGE),
+        "sort": "cdate:asc"
     }
     
     response = await client.get(f"{JABAR_API_BASE}/dataset", params=params)
@@ -52,11 +63,12 @@ async def process_dataset(dataset: Dict[str, Any]) -> Dict[str, Any]:
     """
     Process a dataset entry and prepare it for storage
     """
+    base_url = "https://data.jabarprov.go.id" 
     # Get CSV download URL from bigdata_url if available
-    csv_url = f"https://data.jabarprov.go.id{dataset['bigdata_url']}/csv" if dataset.get('bigdata_url') else None
+    csv_url = f"{base_url}{dataset['bigdata_url']}/csv" if dataset.get('bigdata_url') else None
     
     # Get info URL
-    info_url = f"https://data.jabarprov.go.id/dataset/{dataset['title']}"
+    info_url = f"{base_url}/dataset/{dataset['title']}"
     
     # Extract metadata
     metadata = {item['key']: item['value'] for item in dataset.get('metadata', [])}
@@ -80,8 +92,11 @@ async def update_catalog():
     """
     Update the dataset catalog with data from Jabar OpenData
     """
+    current_dataset_count = await get_dataset_count()
+    print(f"Current number of datasets in database: {current_dataset_count}")
+
     async with AsyncSessionLocal() as session:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
             page = 0
             total_processed = 0
             
@@ -90,7 +105,7 @@ async def update_catalog():
                     print(f"\nFetching page {page + 1}...")
                     
                     # Get datasets page
-                    result = await fetch_datasets_page(client, page)
+                    result = await fetch_datasets_page(client, page, current_dataset_count)
                     datasets = result.get('data', [])
                     
                     if not datasets:
