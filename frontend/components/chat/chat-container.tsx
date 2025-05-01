@@ -14,7 +14,6 @@ import { Database, Settings } from "lucide-react"
 import { getQueryDescription } from "@/lib/sql-parser"
 import type { Dataset, QueryReference } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
-import { ApiSettingsDialog } from "./api-settings-dialog"
 import { ApiStatus } from "./api-status"
 import { StreamingSqlGeneration } from "./streaming-sql-generation"
 
