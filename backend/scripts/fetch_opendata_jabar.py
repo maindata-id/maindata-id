@@ -7,13 +7,13 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy import func, select
 from dotenv import load_dotenv
-import uuid
 from typing import List, Dict, Any
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.models.db import DatasetCatalog
 from app.utils.embedding import get_embedding
+from app.utils.uuid_helper import uuid7
 
 # Load environment variables
 load_dotenv()
@@ -131,12 +131,15 @@ async def update_catalog():
                             if embedding:
                                 # Create dataset record
                                 dataset = DatasetCatalog(
-                                    id=uuid.uuid4(),
+                                    id=uuid7(),
                                     title=processed_data['title'],
                                     description=processed_data['description'],
                                     url=processed_data['url'],
                                     info_url=processed_data['info_url'],
-                                    source=processed_data['source'],
+                                    original_source=processed_data['original_source'],
+                                    direct_source=processed_data['direct_source'],
+                                    slug=processed_data['slug'],
+                                    is_cors_allowed=False,
                                     source_at=processed_data['source_at'],
                                     embedding=embedding
                                 )
