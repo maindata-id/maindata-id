@@ -33,6 +33,7 @@ AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=F
 
 # API Configuration
 JABAR_API_BASE = "https://data.jabarprov.go.id/api-backend"
+OPENDATA_BASE_URL = "https://opendata.jabarprov.go.id"
 DATASETS_PER_PAGE = 100
 HTTP_TIMEOUT = os.getenv("HTTP_TIMEOUT", 20)
 
@@ -64,13 +65,11 @@ async def process_dataset(dataset: Dict[str, Any]) -> Dict[str, Any]:
     """
     Process a dataset entry and prepare it for storage
     """
-    base_url = "https://data.jabarprov.go.id" 
-    opendata_base_url = "https://opendata.jabarprov.go.id"
     # Get CSV download URL from bigdata_url if available
-    csv_url = f"{base_url}{dataset['bigdata_url']}/?download=csv" if dataset.get('bigdata_url') else None
+    csv_url = f"{JABAR_API_BASE}{dataset['bigdata_url']}?download=csv" if dataset.get('bigdata_url') else None
     
     # Get info URL
-    info_url = f"{opendata_base_url}/id/dataset/{dataset['title']}"
+    info_url = f"{OPENDATA_BASE_URL}/id/dataset/{dataset['title']}"
     
     # Extract metadata
     metadata = {item['key']: item['value'] for item in dataset.get('metadata', [])}
