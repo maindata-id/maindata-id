@@ -39,10 +39,13 @@ class DatasetReference(BaseModel):
     id: UUID4
     title: str
     description: str
-    url: Optional[str] = None
+    url: str
     info_url: Optional[str] = None
-    source: str
+    direct_source: str
+    original_source: str
     source_at: datetime
+    is_cors_allowed: bool
+    slug: str
     
     class Config:
         from_attributes = True

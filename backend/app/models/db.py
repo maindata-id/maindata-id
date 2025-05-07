@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Text, DateTime, ForeignKey, func
+from sqlalchemy import Column, String, Text, DateTime, ForeignKey, func, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.ext.declarative import declarative_base
@@ -36,9 +36,12 @@ class DatasetCatalog(Base):
     url = Column(String, nullable=False)
     info_url = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    source = Column(String, nullable=False)
+    direct_source = Column(String, nullable=False)
+    original_source = Column(String, nullable=False)
     source_at = Column(DateTime(timezone=True), nullable=False)
     embedding = Column(Vector(768))  # Gemini embedding dimension
+    is_cors_allowed = Column(Boolean, nullable=False, default=False)
+    slug = Column(String, nullable=False, unique=True)
 
 class ReferenceQuery(Base):
     __tablename__ = "reference_queries"
