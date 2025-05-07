@@ -37,10 +37,13 @@ async def get_relevant_datasets(
         DatasetReference(
             id=dataset.id,
             title=dataset.title,
+            slug=dataset.slug,
             description=dataset.description,
             url=dataset.url,
             info_url=dataset.info_url,
-            source=dataset.source,
+            is_cors_allowed=dataset.is_cors_allowed,
+            direct_source=dataset.direct_source,
+            original_source=dataset.original_source,
             source_at=dataset.source_at
         )
         for dataset in datasets

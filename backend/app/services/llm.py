@@ -9,6 +9,7 @@ load_dotenv()
 
 # Configure Gemini
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 genai.configure(api_key=GOOGLE_API_KEY)
 
 # Initialize the model
@@ -31,7 +32,7 @@ def _create_prompt(
     
     # Format dataset information with table creation
     dataset_context = "\n".join([
-        f"- {dataset.title}: {dataset.description}\n  Data URL: {dataset.url}"
+        f"- {dataset.title}: {dataset.description}\n  Data URL: {API_BASE_URL}/dataset/{dataset.slug}"
         for dataset in datasets
     ])
     

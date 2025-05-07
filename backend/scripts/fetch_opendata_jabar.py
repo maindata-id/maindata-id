@@ -7,13 +7,13 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy import func, select
 from dotenv import load_dotenv
-import uuid
 from typing import List, Dict, Any
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.models.db import DatasetCatalog
 from app.utils.embedding import get_embedding
+from app.utils.uuid_helper import uuid7
 
 # Load environment variables
 load_dotenv()
@@ -33,6 +33,7 @@ AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=F
 
 # API Configuration
 JABAR_API_BASE = "https://data.jabarprov.go.id/api-backend"
+OPENDATA_BASE_URL = "https://opendata.jabarprov.go.id"
 DATASETS_PER_PAGE = 100
 HTTP_TIMEOUT = os.getenv("HTTP_TIMEOUT", 20)
 
@@ -52,7 +53,8 @@ async def fetch_datasets_page(client: httpx.AsyncClient, page: int = 0, base_ski
     params = {
         "limit": DATASETS_PER_PAGE,
         "skip": base_skip + (page * DATASETS_PER_PAGE),
-        "sort": "cdate:asc"
+        "sort": "mdate:asc",
+        "where": { "regional_id": 1 }, # filter only data from pemprov
     }
     
     response = await client.get(f"{JABAR_API_BASE}/dataset", params=params)
@@ -63,19 +65,18 @@ async def process_dataset(dataset: Dict[str, Any]) -> Dict[str, Any]:
     """
     Process a dataset entry and prepare it for storage
     """
-    base_url = "https://data.jabarprov.go.id" 
     # Get CSV download URL from bigdata_url if available
-    csv_url = f"{base_url}{dataset['bigdata_url']}/csv" if dataset.get('bigdata_url') else None
+    csv_url = f"{JABAR_API_BASE}{dataset['bigdata_url']}?download=csv" if dataset.get('bigdata_url') else None
     
     # Get info URL
-    info_url = f"{base_url}/dataset/{dataset['title']}"
+    info_url = f"{OPENDATA_BASE_URL}/id/dataset/{dataset['title']}"
     
     # Extract metadata
     metadata = {item['key']: item['value'] for item in dataset.get('metadata', [])}
     
     # Parse source date
     try:
-        source_at = datetime.strptime(dataset['datetime'], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        source_at = datetime.strptime(dataset['mdate'], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
     except (ValueError, TypeError):
         source_at = datetime.now(timezone.utc)
     
@@ -83,8 +84,10 @@ async def process_dataset(dataset: Dict[str, Any]) -> Dict[str, Any]:
         "title": dataset['name'],
         "description": dataset.get('description', '').replace('<p>', '').replace('</p>', '\n').strip(),
         "url": csv_url,
+        "slug": "jabarprov_" + dataset['title'],
         "info_url": info_url,
-        "source": f"opendata.jabarprov.go.id/{dataset['skpd']['nama_skpd_alias']}",
+        "direct_source": "opendata.jabarprov.go.id",
+        "original_source": "opendata.jabarprov.go.id",
         "source_at": source_at
     }
 
@@ -127,12 +130,15 @@ async def update_catalog():
                             if embedding:
                                 # Create dataset record
                                 dataset = DatasetCatalog(
-                                    id=uuid.uuid4(),
+                                    id=uuid7(),
                                     title=processed_data['title'],
                                     description=processed_data['description'],
                                     url=processed_data['url'],
                                     info_url=processed_data['info_url'],
-                                    source=processed_data['source'],
+                                    original_source=processed_data['original_source'],
+                                    direct_source=processed_data['direct_source'],
+                                    slug=processed_data['slug'],
+                                    is_cors_allowed=False,
                                     source_at=processed_data['source_at'],
                                     embedding=embedding
                                 )
