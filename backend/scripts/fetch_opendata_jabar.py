@@ -52,7 +52,8 @@ async def fetch_datasets_page(client: httpx.AsyncClient, page: int = 0, base_ski
     params = {
         "limit": DATASETS_PER_PAGE,
         "skip": base_skip + (page * DATASETS_PER_PAGE),
-        "sort": "cdate:asc"
+        "sort": "mdate:asc",
+        "where": { "regional_id": 1 }, # filter only data from pemprov
     }
     
     response = await client.get(f"{JABAR_API_BASE}/dataset", params=params)
@@ -64,18 +65,19 @@ async def process_dataset(dataset: Dict[str, Any]) -> Dict[str, Any]:
     Process a dataset entry and prepare it for storage
     """
     base_url = "https://data.jabarprov.go.id" 
+    opendata_base_url = "https://opendata.jabarprov.go.id"
     # Get CSV download URL from bigdata_url if available
-    csv_url = f"{base_url}{dataset['bigdata_url']}/csv" if dataset.get('bigdata_url') else None
+    csv_url = f"{base_url}{dataset['bigdata_url']}/?download=csv" if dataset.get('bigdata_url') else None
     
     # Get info URL
-    info_url = f"{base_url}/dataset/{dataset['title']}"
+    info_url = f"{opendata_base_url}/id/dataset/{dataset['title']}"
     
     # Extract metadata
     metadata = {item['key']: item['value'] for item in dataset.get('metadata', [])}
     
     # Parse source date
     try:
-        source_at = datetime.strptime(dataset['datetime'], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        source_at = datetime.strptime(dataset['mdate'], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
     except (ValueError, TypeError):
         source_at = datetime.now(timezone.utc)
     
@@ -83,8 +85,10 @@ async def process_dataset(dataset: Dict[str, Any]) -> Dict[str, Any]:
         "title": dataset['name'],
         "description": dataset.get('description', '').replace('<p>', '').replace('</p>', '\n').strip(),
         "url": csv_url,
+        "slug": "opendata-jabarprov-" + dataset['title'],
         "info_url": info_url,
-        "source": f"opendata.jabarprov.go.id/{dataset['skpd']['nama_skpd_alias']}",
+        "direct_source": "opendata.jabarprov.go.id",
+        "original_source": "opendata.jabarprov.go.id",
         "source_at": source_at
     }
 
