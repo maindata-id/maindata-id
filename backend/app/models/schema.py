@@ -1,11 +1,11 @@
-from pydantic import BaseModel, Field, UUID4
+from pydantic import BaseModel, Field
 from typing import List, Optional, Union, Dict, Any
 from datetime import datetime
 import uuid
 
 # Request models
 class GenerateSQLRequest(BaseModel):
-    session_id: UUID4
+    session_id: uuid.UUID
     question: str
 
 class StartSessionRequest(BaseModel):
@@ -13,7 +13,7 @@ class StartSessionRequest(BaseModel):
 
 # Response models
 class MessageModel(BaseModel):
-    id: UUID4
+    id: uuid.UUID
     role: str
     content: str
     created_at: datetime
@@ -22,7 +22,7 @@ class MessageModel(BaseModel):
         from_attributes = True
 
 class SessionModel(BaseModel):
-    id: UUID4
+    id: uuid.UUID
     title: Optional[str] = None
     created_at: datetime
     messages: List[MessageModel] = []
@@ -31,12 +31,12 @@ class SessionModel(BaseModel):
         from_attributes = True
 
 class StartSessionResponse(BaseModel):
-    session_id: UUID4
+    session_id: uuid.UUID
     created_at: datetime
     title: Optional[str] = None
 
 class DatasetReference(BaseModel):
-    id: UUID4
+    id: uuid.UUID
     title: str
     description: str
     url: str
@@ -51,7 +51,7 @@ class DatasetReference(BaseModel):
         from_attributes = True
 
 class QueryReference(BaseModel):
-    id: UUID4
+    id: uuid.UUID
     title: str
     description: str
     sql_query: str
