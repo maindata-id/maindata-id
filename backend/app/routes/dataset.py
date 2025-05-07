@@ -7,7 +7,7 @@ from app.models.db import get_db, DatasetCatalog
 
 router = APIRouter()
 
-@router.get("/dataset/{slug}/data")
+@router.get("/dataset/{slug}")
 async def get_dataset_data(
     slug: str,
     db: AsyncSession = Depends(get_db)

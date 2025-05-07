@@ -84,7 +84,7 @@ async def process_dataset(dataset: Dict[str, Any]) -> Dict[str, Any]:
         "title": dataset['name'],
         "description": dataset.get('description', '').replace('<p>', '').replace('</p>', '\n').strip(),
         "url": csv_url,
-        "slug": "opendata-jabarprov-" + dataset['title'],
+        "slug": "jabarprov_" + dataset['title'],
         "info_url": info_url,
         "direct_source": "opendata.jabarprov.go.id",
         "original_source": "opendata.jabarprov.go.id",
