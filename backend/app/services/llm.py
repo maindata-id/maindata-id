@@ -51,7 +51,7 @@ When generating SQL:
 3. Consider the Indonesian context of the data
 4. Make use of the example queries if relevant
 5. Use DuckDB SQL dialect
-6. ALWAYS include the necessary data loading statements in your SQL
+6. ALWAYS include the necessary data loading statements in your SQL if has not been loaded previously.
 7. For each dataset used, first load it using:
    CREATE TABLE IF NOT EXISTS <table_name> AS SELECT * FROM read_csv('<url>');
 8. Use descriptive table names based on the dataset title (lowercase with underscores)
