@@ -49,7 +49,7 @@ export default function Home() {
             <p className="text-muted-foreground">Use natural language or SQL to query your data</p>
           </div>
 
-          <NaturalLanguageInput />
+          <NaturalLanguageInput ref={inputRef} />
 
           <div className="w-full space-y-3">
             <h3 className="text-lg font-medium">Example queries:</h3>
