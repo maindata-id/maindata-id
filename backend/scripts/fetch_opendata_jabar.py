@@ -143,18 +143,23 @@ async def update_catalog():
                                     embedding=embedding
                                 )
                                 
-                                session.add(dataset)
-                                total_processed += 1
-                                print(f"Added dataset: {dataset.title}")
+                                try:
+                                    session.add(dataset)
+                                    # Commit after each page
+                                    await session.commit()
+                    
+                                    total_processed += 1
+                                    print(f"Added dataset: {dataset.title}")
+                                except Exception as e:
+                                    await session.rollback()
+                                    print(f"Error processing dataset: {str(e)}")
+                                    continue
                             else:
                                 print(f"Failed to generate embedding for: {processed_data['title']}")
                                 
                         except Exception as e:
                             print(f"Error processing dataset: {str(e)}")
                             continue
-                    
-                    # Commit after each page
-                    await session.commit()
                     
                     # Check if we've processed all pages
                     if len(datasets) < DATASETS_PER_PAGE:
