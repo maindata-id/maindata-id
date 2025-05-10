@@ -66,6 +66,16 @@ class GenerateSQLResponse(BaseModel):
     explanation: str
     messages: List[MessageModel]
 
+class DatasetListMetadata(BaseModel):
+    limit: Optional[int] = 10
+    after: Optional[uuid.UUID] = None  # Cursor for the next page
+    search: Optional[str] = None
+
+class DatasetListResponse(BaseModel):
+    message: str
+    metadata: DatasetListMetadata
+    data: List[DatasetReference]
+
 # Error models
 class ErrorResponse(BaseModel):
     detail: str
