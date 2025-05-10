@@ -15,6 +15,13 @@ async function createExampleSession(title: string): Promise<string> {
   }
 }
 
+const exampleQueries = [
+  "apa 3 kota dengan jumlah sapi perah terbanyak di jawa barat?",
+  "jenis kawasan manakah yang paling banyak di antara semua kawasan hutan konservasi (darat) yang ad di jawa barat?",
+  "berapa jumlah desa di jawa barat yang sungainya terkena limbah?",
+  "apa fitur yang paling banyak diakses di Website Pusat Informasi dan Koordinasi COVID-19 Jawa Barat (PIKOBAR)?",
+]
+
 export default function Home() {
   return (
     <div className="flex flex-col min-h-screen">
@@ -43,30 +50,19 @@ export default function Home() {
           <div className="w-full space-y-3">
             <h3 className="text-lg font-medium">Example queries:</h3>
             <div className="grid gap-2">
-              <Button variant="outline" className="justify-start h-auto py-3 text-left" asChild>
-                <Link href="/create-session?query=Create%20a%20new%20table%20for%20population%20data">
-                  <Sparkles className="w-4 h-4 mr-2 text-emerald-500" />
-                  Create a new table for population data
-                </Link>
-              </Button>
-              <Button variant="outline" className="justify-start h-auto py-3 text-left" asChild>
-                <Link href="/create-session?query=Show%20me%20all%20available%20tables">
-                  <Sparkles className="w-4 h-4 mr-2 text-emerald-500" />
-                  Show me all available tables
-                </Link>
-              </Button>
-              <Button variant="outline" className="justify-start h-auto py-3 text-left" asChild>
-                <Link href="/create-session?query=CREATE%20TABLE%20population%20(year%20INTEGER%2C%20region%20VARCHAR%2C%20count%20INTEGER)">
-                  <Sparkles className="w-4 h-4 mr-2 text-emerald-500" />
-                  CREATE TABLE population (year INTEGER, region VARCHAR, count INTEGER)
-                </Link>
-              </Button>
-              <Button variant="outline" className="justify-start h-auto py-3 text-left" asChild>
-                <Link href="/create-session?query=INSERT%20INTO%20population%20VALUES%20(2023%2C%20'Jakarta'%2C%2010500000)">
-                  <Sparkles className="w-4 h-4 mr-2 text-emerald-500" />
-                  INSERT INTO population VALUES (2023, 'Jakarta', 10500000)
-                </Link>
-              </Button>
+              {exampleQueries.map((query) => (
+                <Button
+                  key={query}
+                  variant="outline"
+                  className="justify-start h-auto py-3 text-left"
+                  asChild
+                >
+                  <Link href={`/create-session?query=${encodeURIComponent(query)}`}>
+                    <Sparkles className="w-4 h-4 mr-2 text-emerald-500" />
+                    {query}
+                  </Link>
+                </Button>
+              ))}
             </div>
           </div>
 

@@ -10,7 +10,7 @@ import { setCurrentSessionId } from "@/lib/llm"
 import { DuckDBStatus } from "./duckdb-status"
 import { useDuckDB } from "@/components/duckdb-provider"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Database, Settings } from "lucide-react"
+import { Database, Settings, Loader2 } from "lucide-react"
 import { getQueryDescription } from "@/lib/sql-parser"
 import type { Dataset, QueryReference } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
@@ -46,6 +46,7 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
   const [tablesLoaded, setTablesLoaded] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [initialQueryProcessed, setInitialQueryProcessed] = useState(false)
+  const [isExecutingQuery, setIsExecutingQuery] = useState(false)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const { isReady: isDuckDBReady } = useDuckDB()
 
@@ -180,8 +181,14 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
     setMessages((prev) => [...prev, loadingMessage])
 
     try {
+      // Set executing query state to true
+      setIsExecutingQuery(true)
+
       // Execute the SQL query directly
       const queryResults = await executeQuery(sql)
+
+      // Set executing query state to false
+      setIsExecutingQuery(false)
 
       // Remove loading message
       setMessages((prev) => prev.filter((msg) => msg.id !== loadingMessageId))
@@ -219,6 +226,9 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
 
       setMessages((prev) => [...prev, resultMessage])
     } catch (err: any) {
+      // Set executing query state to false
+      setIsExecutingQuery(false)
+
       // Remove loading message
       setMessages((prev) => prev.filter((msg) => msg.id !== loadingMessageId))
 
@@ -263,8 +273,14 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
       // Validate SQL before executing
       const cleanedSql = validateAndCleanSql(sql)
 
+      // Set executing query state to true
+      setIsExecutingQuery(true)
+
       // Execute the generated SQL
       const queryResults = await executeQuery(cleanedSql)
+
+      // Set executing query state to false
+      setIsExecutingQuery(false)
 
       // Add result message
       const resultMessage: Message = {
@@ -285,6 +301,9 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
         return [...filteredMessages, resultMessage]
       })
     } catch (err: any) {
+      // Set executing query state to false
+      setIsExecutingQuery(false)
+
       // Add error message
       const errorMessage: Message = {
         id: `error-${Date.now()}`,
@@ -341,6 +360,13 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
     setMessages((prev) => [...prev, cancelledMessage])
   }
 
+  // Check if any message is currently streaming
+  const isAnyMessageStreaming = messages.some((message) => message.isStreaming)
+
+  // Check if we should show the "No tables" alert
+  const shouldShowNoTablesAlert =
+    isDuckDBReady && tables.length === 0 && tablesLoaded && !isExecutingQuery && !isAnyMessageStreaming
+
   return (
     <div className="flex flex-col h-full">
       <div className="border-b flex justify-between items-center">
@@ -349,6 +375,12 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
           <ApiStatus />
           {sessionId && (
             <div className="px-2 py-1 text-xs bg-muted rounded-md">Session: {sessionId.substring(0, 8)}...</div>
+          )}
+          {isExecutingQuery && (
+            <div className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-md animate-pulse">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              <span>Executing query...</span>
+            </div>
           )}
         </div>
         <Button
@@ -363,7 +395,7 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {isDuckDBReady && tables.length === 0 && tablesLoaded && (
+        {shouldShowNoTablesAlert && (
           <Alert>
             <Database className="h-4 w-4" />
             <AlertDescription>
@@ -382,8 +414,9 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
       </div>
 
       <div className="border-t p-4">
-        <ChatInput onSendMessage={handleSendMessage} disabled={!isDuckDBReady} />
+        <ChatInput onSendMessage={handleSendMessage} disabled={!isDuckDBReady || isExecutingQuery} />
       </div>
+
     </div>
   )
 }

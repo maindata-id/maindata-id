@@ -90,11 +90,22 @@ export async function executeSingleQuery(sql: string): Promise<any[]> {
 
   console.log("Executing single query:", sql)
 
-  // Execute the query
-  const result = await conn.query(sql)
+  const startTime = performance.now()
 
-  // Convert to array of objects
-  return result.toArray().map((row) => row.toJSON())
+  try {
+    // Execute the query
+    const result = await conn.query(sql)
+
+    const endTime = performance.now()
+    console.log(`Query executed in ${(endTime - startTime).toFixed(2)}ms`)
+
+    // Convert to array of objects
+    return result.toArray().map((row) => row.toJSON())
+  } catch (error) {
+    const endTime = performance.now()
+    console.error(`Query failed after ${(endTime - startTime).toFixed(2)}ms:`, error)
+    throw error
+  }
 }
 
 // Execute multiple SQL queries
@@ -105,6 +116,7 @@ export interface QueryResult {
   errorMessage?: string
   isDdl: boolean
   isDataModifying: boolean
+  executionTime?: number
 }
 
 // Execute a SQL query (which may contain multiple statements)
@@ -121,6 +133,8 @@ export async function executeQuery(sql: string): Promise<QueryResult[]> {
       },
     ]
   }
+
+  const totalStartTime = performance.now()
 
   try {
     // Import the SQL parser only when needed
@@ -153,11 +167,15 @@ export async function executeQuery(sql: string): Promise<QueryResult[]> {
     const results: QueryResult[] = []
 
     for (const query of queries) {
+      const queryStartTime = performance.now()
+
       try {
         const isDdl = isDdlStatement(query)
         const isDataModifying = isDataModifyingStatement(query)
 
         const queryResult = await executeSingleQuery(query)
+        const queryEndTime = performance.now()
+        const executionTime = queryEndTime - queryStartTime
 
         results.push({
           sql: query,
@@ -165,8 +183,12 @@ export async function executeQuery(sql: string): Promise<QueryResult[]> {
           isError: false,
           isDdl,
           isDataModifying,
+          executionTime,
         })
       } catch (error: any) {
+        const queryEndTime = performance.now()
+        const executionTime = queryEndTime - queryStartTime
+
         console.error(`Error executing query "${query}":`, error)
 
         results.push({
@@ -176,14 +198,19 @@ export async function executeQuery(sql: string): Promise<QueryResult[]> {
           errorMessage: error.message || "Unknown error",
           isDdl: isDdlStatement(query),
           isDataModifying: isDataModifyingStatement(query),
+          executionTime,
         })
       }
     }
 
+    const totalEndTime = performance.now()
+    console.log(`Total query execution time: ${(totalEndTime - totalStartTime).toFixed(2)}ms`)
+
     return results
   } catch (error: any) {
     // If there's an error outside the individual query execution
-    console.error("Query execution error:", error)
+    const totalEndTime = performance.now()
+    console.error(`Query execution error after ${(totalEndTime - totalStartTime).toFixed(2)}ms:`, error)
     throw error
   }
 }

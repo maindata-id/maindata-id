@@ -14,6 +14,7 @@ import {
   X,
   Info,
   ExternalLink,
+  Clock,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Message } from "./chat-container"
@@ -48,6 +49,11 @@ export function ChatMessage({ message }: ChatMessageProps) {
   const hasDatasets = message.datasets && message.datasets.length > 0
   const hasReferences = message.references && message.references.length > 0
   const isStreaming = message.isStreaming
+
+  // Calculate total execution time if available
+  const totalExecutionTime = hasQueryResults
+    ? message.queryResults.reduce((total, query) => total + (query.executionTime || 0), 0)
+    : 0
 
   return (
     <div className={cn("flex w-full", message.type === "user" ? "justify-end" : "justify-start")}>
@@ -110,7 +116,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
               </div>
               <CollapsibleContent>
                 <div className="p-4 text-sm">
-                  <pre className="text-wrap bg-muted px-1.5 py-0.5 rounded">{message.explanation}</pre>
+                  <p>{message.explanation}</p>
 
                   {/* Datasets used */}
                   {hasDatasets && (
@@ -171,6 +177,11 @@ export function ChatMessage({ message }: ChatMessageProps) {
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-medium">
                     Multiple SQL Statements ({message.queryResults.length})
+                    {totalExecutionTime > 0 && (
+                      <span className="ml-2 text-xs text-muted-foreground flex items-center gap-1">
+                        <Clock className="h-3 w-3" /> {totalExecutionTime.toFixed(2)}ms
+                      </span>
+                    )}
                   </CardTitle>
                   <Button variant="ghost" size="sm" onClick={toggleExpand} className="h-8 w-8 p-0">
                     {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -201,11 +212,16 @@ export function ChatMessage({ message }: ChatMessageProps) {
                                 <Check className="h-3 w-3" /> Success
                               </span>
                             )}
+                            {result.executionTime && (
+                              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Clock className="h-3 w-3" /> {result.executionTime.toFixed(2)}ms
+                              </span>
+                            )}
                           </div>
                         </AccordionTrigger>
                         <AccordionContent>
                           <div className="space-y-3">
-                            <pre className="font-mono text-xs bg-muted p-2 rounded overflow-x-auto">{result.sql}</pre>
+                            <div className="font-mono text-xs bg-muted p-2 rounded overflow-x-auto">{result.sql}</div>
 
                             {result.isError ? (
                               <div className="text-destructive text-sm p-2 border border-destructive/20 bg-destructive/10 rounded">
@@ -256,7 +272,12 @@ export function ChatMessage({ message }: ChatMessageProps) {
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-medium flex items-center gap-2">
                     {message.datasetName && <Badge variant="outline">{message.datasetName}</Badge>}
-                    Results ({message.queryResults[0].results.length} rows)
+                    <span>Results ({message.queryResults[0].results.length} rows)</span>
+                    {message.queryResults[0].executionTime && (
+                      <span className="ml-2 text-xs text-muted-foreground flex items-center gap-1">
+                        <Clock className="h-3 w-3" /> {message.queryResults[0].executionTime.toFixed(2)}ms
+                      </span>
+                    )}
                   </CardTitle>
                   <Button variant="ghost" size="sm" onClick={toggleExpand} className="h-8 w-8 p-0">
                     {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -317,7 +338,12 @@ export function ChatMessage({ message }: ChatMessageProps) {
                 <CardHeader className="py-3">
                   <CardTitle className="text-sm font-medium flex items-center gap-2">
                     <Check className="h-4 w-4 text-green-500" />
-                    Success
+                    <span>Success</span>
+                    {message.queryResults[0].executionTime && (
+                      <span className="ml-2 text-xs text-muted-foreground flex items-center gap-1">
+                        <Clock className="h-3 w-3" /> {message.queryResults[0].executionTime.toFixed(2)}ms
+                      </span>
+                    )}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -338,7 +364,12 @@ export function ChatMessage({ message }: ChatMessageProps) {
               <CardHeader className="py-3">
                 <CardTitle className="text-sm font-medium flex items-center gap-2 text-destructive">
                   <AlertTriangle className="h-4 w-4" />
-                  Error
+                  <span>Error</span>
+                  {message.queryResults[0].executionTime && (
+                    <span className="ml-2 text-xs text-muted-foreground flex items-center gap-1">
+                      <Clock className="h-3 w-3" /> {message.queryResults[0].executionTime.toFixed(2)}ms
+                    </span>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent>
