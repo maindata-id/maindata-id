@@ -45,8 +45,8 @@ export default function Home() {
       <main className="flex-1">
         <div className="container flex flex-col items-center justify-center max-w-3xl py-20 space-y-10">
           <div className="space-y-4 text-center">
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Explore and analyze data with DuckDB</h2>
-            <p className="text-muted-foreground">Use natural language or SQL to query your data</p>
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Unearth Hidden Gems in Open Data!</h2>
+            <p className="text-muted-foreground">Ever wonder what secrets lie in publicly available data? Let's find out! Ask questions in plain English (or SQL, if you're feeling fancy) and let's dig in!</p>
           </div>
 
           <NaturalLanguageInput ref={inputRef} />
