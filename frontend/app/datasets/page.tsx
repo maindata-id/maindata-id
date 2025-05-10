@@ -2,80 +2,136 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, Database, FileText, RefreshCw, Loader2 } from "lucide-react"
+import { ArrowLeft, Database, FileText, RefreshCw, Loader2, Search, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { getTables, getTableSchema } from "@/lib/duckdb"
-import { useDuckDB } from "@/components/duckdb-provider"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { startSession } from "@/lib/api-client"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
-interface TableInfo {
-  name: string
-  columns: { name: string; type: string }[]
+interface Dataset {
+  id: string
+  title: string
+  description: string
+  info_url?: string
+  direct_source?: string
+  original_source?: string
+  source_at?: string
+  is_cors_allowed?: boolean
+  slug?: string
+}
+
+interface DatasetResponse {
+  message: string
+  metadata: {
+    limit: number
+    after: string | null
+    search: string | null
+  }
+  data: Dataset[]
 }
 
 export default function DatasetsPage() {
-  const [tables, setTables] = useState<TableInfo[]>([])
+  const [datasets, setDatasets] = useState<Dataset[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
-  const { isReady } = useDuckDB()
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
+  const [after, setAfter] = useState<string | null>(null)
+  const [hasMore, setHasMore] = useState(true)
+  const [limit] = useState(10)
   const [creatingSession, setCreatingSession] = useState<Record<string, boolean>>({})
 
-  const loadTables = async () => {
-    if (!isReady) return
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
+  // Reset pagination when search term changes
+  useEffect(() => {
+    setDatasets([])
+    setAfter(null)
+    setHasMore(true)
+  }, [debouncedSearchTerm])
+
+  const fetchDatasets = async (reset = false) => {
+    if (isLoading && !reset) return
 
     setIsLoading(true)
     setError(null)
 
-    try {
-      const tableNames = await getTables()
+    const currentAfter = reset ? null : after
 
-      const tableInfoPromises = tableNames.map(async (tableName) => {
-        try {
-          const columns = await getTableSchema(tableName)
-          return { name: tableName, columns }
-        } catch (err) {
-          console.error(`Error loading schema for ${tableName}:`, err)
-          return { name: tableName, columns: [] }
-        }
+    try {
+      const apiUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL}/dataset`
+      const params = new URLSearchParams()
+
+      if (limit) params.append("limit", limit.toString())
+      if (currentAfter) params.append("after", currentAfter)
+      if (debouncedSearchTerm) params.append("search", debouncedSearchTerm)
+
+      const url = `${apiUrl}${params.toString() ? `?${params.toString()}` : ""}`
+
+      const response = await fetch(url, {
+        headers: {
+          Accept: "application/json",
+        },
       })
 
-      const tableInfos = await Promise.all(tableInfoPromises)
-      setTables(tableInfos)
+      if (!response.ok) {
+        throw new Error(`Failed to fetch datasets: ${response.status} ${response.statusText}`)
+      }
+
+      const data: DatasetResponse = await response.json()
+
+      if (reset) {
+        setDatasets(data.data)
+      } else {
+        setDatasets((prev) => [...prev, ...data.data])
+      }
+
+      setAfter(data.data.length > 0 ? data.data[data.data.length - 1].id : null)
+      setHasMore(data.data.length === limit)
     } catch (err) {
-      console.error("Error loading tables:", err)
-      setError("Failed to load tables. Please try again.")
+      console.error("Error loading datasets:", err)
+      setError("Failed to load datasets. Please try again.")
     } finally {
       setIsLoading(false)
     }
   }
 
   useEffect(() => {
-    if (isReady) {
-      loadTables()
-    }
-  }, [isReady])
+    fetchDatasets(true)
+  }, [debouncedSearchTerm])
 
-  const filteredTables = tables.filter((table) => table.name.toLowerCase().includes(searchTerm.toLowerCase()))
-
-  const handleQueryTable = async (tableName: string) => {
-    setCreatingSession((prev) => ({ ...prev, [tableName]: true }))
+  const handleQueryDataset = async (datasetId: string, datasetTitle: string) => {
+    setCreatingSession((prev) => ({ ...prev, [datasetId]: true }))
 
     try {
-      const session = await startSession(`Table: ${tableName}`)
-      window.location.href = `/query/${session.session_id}?dataset=${tableName}`
+      const session = await startSession(`Dataset: ${datasetTitle}`)
+      window.location.href = `/query/${session.session_id}?dataset=${datasetId}`
     } catch (error) {
       console.error("Failed to create session:", error)
       alert("Failed to create a new session. Please try again.")
     } finally {
-      setCreatingSession((prev) => ({ ...prev, [tableName]: false }))
+      setCreatingSession((prev) => ({ ...prev, [datasetId]: false }))
     }
+  }
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return "N/A"
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    })
   }
 
   return (
@@ -97,13 +153,16 @@ export default function DatasetsPage() {
       <main className="flex-1 py-8">
         <div className="container space-y-6">
           <div className="flex items-center gap-4">
-            <Input
-              placeholder="Search datasets..."
-              className="max-w-md"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            <Button onClick={loadTables} disabled={!isReady || isLoading}>
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search datasets..."
+                className="pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <Button onClick={() => fetchDatasets(true)} disabled={isLoading}>
               {isLoading ? (
                 <>
                   <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
@@ -121,89 +180,122 @@ export default function DatasetsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Available Datasets</CardTitle>
-              <CardDescription>Browse and explore tables in your DuckDB instance</CardDescription>
+              <CardDescription>Browse and explore datasets from the catalog</CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {isLoading && datasets.length === 0 ? (
                 <div className="space-y-4">
-                  <Skeleton className="h-12 w-full" />
-                  <Skeleton className="h-12 w-full" />
-                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-24 w-full" />
+                  <Skeleton className="h-24 w-full" />
+                  <Skeleton className="h-24 w-full" />
                 </div>
               ) : error ? (
                 <Alert variant="destructive">
                   <AlertTitle>Error</AlertTitle>
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
-              ) : tables.length === 0 ? (
+              ) : datasets.length === 0 ? (
                 <div className="text-center py-8">
                   <Database className="mx-auto h-12 w-12 text-muted-foreground opacity-50" />
-                  <h3 className="mt-4 text-lg font-medium">No tables found</h3>
+                  <h3 className="mt-4 text-lg font-medium">No datasets found</h3>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    Create tables using SQL queries in the query interface.
+                    {debouncedSearchTerm
+                      ? `No datasets matching "${debouncedSearchTerm}"`
+                      : "No datasets available in the catalog."}
                   </p>
-                  <Button className="mt-4" onClick={() => handleQueryTable("")}>
-                    Go to Query Interface
-                  </Button>
-                </div>
-              ) : filteredTables.length === 0 ? (
-                <div className="text-center py-8">
-                  <p>No tables matching "{searchTerm}"</p>
                 </div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Table Name</TableHead>
-                      <TableHead>Columns</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredTables.map((table) => (
-                      <TableRow key={table.name}>
-                        <TableCell>
-                          <div className="font-medium">{table.name}</div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            {table.columns.map((column) => (
-                              <Badge key={column.name} variant="outline" className="text-xs">
-                                {column.name}: {column.type}
-                              </Badge>
-                            ))}
-                            {table.columns.length === 0 && (
-                              <span className="text-xs text-muted-foreground">No columns found</span>
+                <div className="space-y-4">
+                  {datasets.map((dataset) => (
+                    <Card key={dataset.id} className="overflow-hidden">
+                      <div className="p-6">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="text-lg font-semibold">{dataset.title}</h3>
+                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{dataset.description}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleQueryDataset(dataset.id, dataset.title)}
+                                    disabled={creatingSession[dataset.id]}
+                                  >
+                                    {creatingSession[dataset.id] ? (
+                                      <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                                    ) : (
+                                      <Database className="w-4 h-4 mr-1" />
+                                    )}
+                                    Query
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Create a new query session with this dataset</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+
+                            {dataset.info_url && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button size="sm" variant="outline" asChild>
+                                      <a href={dataset.info_url} target="_blank" rel="noopener noreferrer">
+                                        <FileText className="w-4 h-4 mr-1" />
+                                        Info
+                                      </a>
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>View dataset documentation</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
                             )}
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleQueryTable(table.name)}
-                              disabled={creatingSession[table.name]}
-                            >
-                              {creatingSession[table.name] ? (
-                                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                              ) : (
-                                <Database className="w-4 h-4 mr-1" />
-                              )}
-                              Query
-                            </Button>
-                            <Button size="sm" variant="outline">
-                              <FileText className="w-4 h-4 mr-1" />
-                              Metadata
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 mt-4">
+                          <Badge variant="outline" className="text-xs">
+                            Added: {formatDate(dataset.source_at)}
+                          </Badge>
+                          {dataset.is_cors_allowed && (
+                            <Badge variant="outline" className="text-xs bg-green-50">
+                              CORS Allowed
+                            </Badge>
+                          )}
+                          {dataset.original_source && (
+                            <Badge variant="outline" className="text-xs">
+                              Source: {dataset.original_source}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
               )}
             </CardContent>
+            {datasets.length > 0 && hasMore && (
+              <CardFooter className="flex justify-center border-t p-4">
+                <Button variant="outline" onClick={() => fetchDatasets()} disabled={isLoading || !hasMore}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Loading more...
+                    </>
+                  ) : (
+                    <>
+                      Load more
+                      <ChevronRight className="w-4 h-4 ml-2" />
+                    </>
+                  )}
+                </Button>
+              </CardFooter>
+            )}
           </Card>
         </div>
       </main>
