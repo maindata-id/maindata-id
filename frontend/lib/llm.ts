@@ -117,6 +117,7 @@ function processSSEData(data: string): string {
     .replaceAll(/\n\ndata: +/g, '') // split based on SSE format
     .replace(/^data: /, '') // cleanup additional data in the beginning
     .trim()
+    .replace(/\[DONE\]$/, '') // cleanup closing marker in the end
 
   // For debugging
   if (process.env.NODE_ENV === "development") {
