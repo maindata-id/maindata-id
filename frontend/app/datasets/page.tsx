@@ -299,12 +299,6 @@ export default function DatasetsPage() {
           </Card>
         </div>
       </main>
-
-      <footer className="border-t">
-        <div className="container py-6 text-sm text-center text-muted-foreground">
-          &copy; {new Date().getFullYear()} MainData.id - Simplifying access to Indonesian government data
-        </div>
-      </footer>
     </div>
   )
 }

@@ -71,11 +71,6 @@ export default function Home() {
           </Button>
         </div>
       </main>
-      <footer className="border-t">
-        <div className="container py-6 text-sm text-center text-muted-foreground">
-          &copy; {new Date().getFullYear()} MainData.id - Data exploration powered by DuckDB
-        </div>
-      </footer>
     </div>
   )
 }

@@ -60,12 +60,6 @@ export default function QueryPage({ params }: { params: { sessionId: string } })
           <ChatContainer sessionId={sessionId} initialQuery={initialQuery} initialDataset={datasetParam} />
         </div>
       </main>
-
-      <footer className="border-t">
-        <div className="container py-4 text-sm text-center text-muted-foreground">
-          &copy; {new Date().getFullYear()} MainData.id - Simplifying access to Indonesian government data
-        </div>
-      </footer>
     </div>
   )
 }
