@@ -79,31 +79,6 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
         .then((availableTables) => {
           setTables(availableTables)
           setTablesLoaded(true)
-
-          // Add a message about available tables
-          if (availableTables.length === 0) {
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: "no-tables",
-                type: "system",
-                content: "No tables found. You can create tables using SQL queries.",
-                timestamp: new Date(),
-                isSQL: false,
-              },
-            ])
-          } else {
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: "tables-info",
-                type: "system",
-                content: `Available tables: ${availableTables.join(", ")}`,
-                timestamp: new Date(),
-                isSQL: false,
-              },
-            ])
-          }
         })
         .catch((error) => {
           console.error("Failed to load tables:", error)

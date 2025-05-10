@@ -116,7 +116,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
               </div>
               <CollapsibleContent>
                 <div className="p-4 text-sm">
-                  <p>{message.explanation}</p>
+                  <pre>{message.explanation}</pre>
 
                   {/* Datasets used */}
                   {hasDatasets && (
@@ -221,7 +221,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
                         </AccordionTrigger>
                         <AccordionContent>
                           <div className="space-y-3">
-                            <div className="font-mono text-xs bg-muted p-2 rounded overflow-x-auto">{result.sql}</div>
+                            <pre className="font-mono text-xs bg-muted p-2 rounded overflow-x-auto">{result.sql}</pre>
 
                             {result.isError ? (
                               <div className="text-destructive text-sm p-2 border border-destructive/20 bg-destructive/10 rounded">

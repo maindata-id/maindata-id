@@ -2,20 +2,29 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useImperativeHandle, forwardRef } from "react"
 import { useRouter } from "next/navigation"
 import { Search, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { startSession } from "@/lib/api-client"
 
-export default function NaturalLanguageInput() {
+// Define the ref type for the component
+export interface NaturalLanguageInputRef {
+  setAndSubmitQuery: (query: string) => void
+}
+
+const NaturalLanguageInput = forwardRef<NaturalLanguageInputRef, {}>((props, ref) => {
   const [query, setQuery] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  // Create a function to handle query submission
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) {
+      e.preventDefault()
+    }
+
     if (!query.trim() || isLoading) return
 
     setIsLoading(true)
@@ -35,6 +44,17 @@ export default function NaturalLanguageInput() {
       setIsLoading(false)
     }
   }
+
+  // Expose methods to parent components via ref
+  useImperativeHandle(ref, () => ({
+    setAndSubmitQuery: (newQuery: string) => {
+      setQuery(newQuery)
+      // Use setTimeout to ensure the state is updated before submitting
+      setTimeout(() => {
+        handleSubmit()
+      }, 0)
+    },
+  }))
 
   return (
     <form onSubmit={handleSubmit} className="w-full">
@@ -59,4 +79,8 @@ export default function NaturalLanguageInput() {
       </div>
     </form>
   )
-}
+})
+
+NaturalLanguageInput.displayName = "NaturalLanguageInput"
+
+export default NaturalLanguageInput

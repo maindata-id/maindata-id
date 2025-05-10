@@ -1,19 +1,12 @@
+"use client"
+
+import type React from "react"
+
+import { useRef } from "react"
 import { Sparkles } from "lucide-react"
 import Link from "next/link"
-import NaturalLanguageInput from "@/components/natural-language-input"
+import NaturalLanguageInput, { type NaturalLanguageInputRef } from "@/components/natural-language-input"
 import { Button } from "@/components/ui/button"
-import { startSession } from "@/lib/api-client"
-
-// Function to create a session and return the URL
-async function createExampleSession(title: string): Promise<string> {
-  try {
-    const session = await startSession(title)
-    return `/query/${session.session_id}`
-  } catch (error) {
-    console.error("Failed to create example session:", error)
-    return "#"
-  }
-}
 
 const exampleQueries = [
   "apa 3 kota dengan jumlah sapi perah terbanyak di jawa barat?",
@@ -23,6 +16,17 @@ const exampleQueries = [
 ]
 
 export default function Home() {
+  // Create a ref to the NaturalLanguageInput component
+  const inputRef = useRef<NaturalLanguageInputRef>(null)
+
+  // Function to handle example query clicks
+  const handleExampleClick = (query: string) => (e: React.MouseEvent) => {
+    e.preventDefault()
+    if (inputRef.current) {
+      inputRef.current.setAndSubmitQuery(query)
+    }
+  }
+
   return (
     <div className="flex flex-col min-h-screen">
       <header className="border-b">
@@ -55,12 +59,10 @@ export default function Home() {
                   key={query}
                   variant="outline"
                   className="justify-start h-auto py-3 text-left"
-                  asChild
+                  onClick={handleExampleClick(query)}
                 >
-                  <Link href={`/create-session?query=${encodeURIComponent(query)}`}>
-                    <Sparkles className="w-4 h-4 mr-2 text-emerald-500" />
-                    {query}
-                  </Link>
+                  <Sparkles className="w-4 h-4 mr-2 text-emerald-500" />
+                  {query}
                 </Button>
               ))}
             </div>
