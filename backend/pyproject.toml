@@ -23,6 +23,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=8.3.5",
+    "pytest-asyncio>=0.26.0",
     "pytest-watcher>=0.4.3",
 ]
 
