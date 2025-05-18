@@ -59,7 +59,7 @@ class ChatSession(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     title = Column(String)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
+
     # Relationship to messages
     messages = relationship("ChatMessage", back_populates="session", cascade="all, delete-orphan")
 
@@ -71,7 +71,7 @@ class ChatMessage(Base):
     role = Column(String, nullable=False)  # "user" or "assistant"
     content = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
+
     # Relationship to session
     session = relationship("ChatSession", back_populates="messages")
 
