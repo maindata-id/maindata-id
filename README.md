@@ -117,6 +117,9 @@ uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
 # for prod
 uv run uvicorn main:app --host 0.0.0.0 --port 8000
+
+# run test
+uv run pytest
 ```
 
 ## 📬 Roadmap
