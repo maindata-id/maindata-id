@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -5,10 +6,18 @@ import uvicorn
 from app.routes import generate_sql, session, dataset
 from app.models.db import init_db
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # startup stage
+    await init_db()
+    yield
+    # shutdown stage
+
 app = FastAPI(
     title="MainData.id API",
     description="Backend API for natural language to SQL translation",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan,
 )
 
 # Configure CORS
@@ -24,10 +33,6 @@ app.add_middleware(
 app.include_router(generate_sql.router, tags=["SQL Generation"])
 app.include_router(session.router, tags=["Chat Sessions"])
 app.include_router(dataset.router, tags=["Datasets"])
-
-@app.on_event("startup")
-async def startup():
-    await init_db()
 
 @app.get("/", tags=["Health Check"])
 async def root():
