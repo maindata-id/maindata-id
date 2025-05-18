@@ -5,11 +5,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.db import get_db, ChatSession, ChatMessage, engine, Base
 import pytest
 import asyncio
+import pytest_asyncio # Import pytest_asyncio
 
 # Use httpx.AsyncClient for asynchronous testing
 # client = TestClient(app) # Remove synchronous client
 
-@pytest.fixture(scope="function", autouse=True)
+@pytest_asyncio.fixture(scope="function", autouse=True) # Use pytest_asyncio.fixture
 async def cleanup_db():
     """Clean up database tables after each test."""
     async with AsyncSession(engine) as session:
