@@ -117,13 +117,19 @@ uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
 # for prod
 uv run uvicorn main:app --host 0.0.0.0 --port 8000
+
+# run test
+uv run pytest
+
+# run test with watch mode (with pytest-watcher package)
+uv run ptw .
 ```
 
 ## 📬 Roadmap
 
 - [x] MVP with NL → SQL + DuckDB
 - [x] RAG-enhanced query understanding
-- [ ] stream based response to frontend
+- [x] stream based response to frontend
 - [ ] basic user registration & login, and history management
 - [ ] Chart suggestion + auto-viz
 - [ ] One-click CSV upload for user datasets

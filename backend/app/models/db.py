@@ -1,8 +1,7 @@
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey, func, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import sessionmaker, relationship,  declarative_base
 import os
 from dotenv import load_dotenv
 import uuid

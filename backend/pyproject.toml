@@ -1,5 +1,5 @@
 [project]
-name = "backend-2"
+name = "backend"
 version = "0.1.0"
 description = "Backend for MainData.id"
 readme = "README.md"
@@ -19,3 +19,19 @@ dependencies = [
     "sqlalchemy==2.0.28",
     "uvicorn==0.29.0",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.5",
+    "pytest-watcher>=0.4.3",
+]
+
+# more info see https://pypi.org/project/pytest-watcher/
+[tool.pytest-watcher]
+now = true
+clear = true
+delay = 0.2
+runner = "pytest"
+runner_args = []
+patterns = ["*.py"]
+ignore_patterns = []
