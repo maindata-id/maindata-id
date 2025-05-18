@@ -27,7 +27,7 @@ async def db_session():
         await session.close()
 
 @pytest.fixture(scope="function")
-async def client_with_db(db_session):
+def client_with_db(db_session):
     """Provide a test client with the overridden database dependency."""
     app.dependency_overrides[get_db] = lambda: db_session
     with TestClient(app) as client:
@@ -37,7 +37,7 @@ async def client_with_db(db_session):
 @pytest.mark.asyncio
 async def test_start_session(client_with_db):
     """Test the /start-session endpoint."""
-    async with client_with_db as client:
+    with client_with_db as client:
         response = client.post("/start-session")
         assert response.status_code == 200
         data = response.json()
@@ -55,7 +55,7 @@ async def test_start_session(client_with_db):
 @pytest.mark.asyncio
 async def test_get_session_not_found(client_with_db):
     """Test getting a session that does not exist."""
-    async with client_with_db as client:
+    with client_with_db as client:
         fake_session_id = "123e4567-e89b-12d3-a456-426614174000"
         response = client.get(f"/session/{fake_session_id}")
         assert response.status_code == 404
@@ -64,7 +64,7 @@ async def test_get_session_not_found(client_with_db):
 @pytest.mark.asyncio
 async def test_get_session_with_messages(client_with_db):
     """Test getting a session with existing messages."""
-    async with client_with_db as client:
+    with client_with_db as client:
         # Start a session
         start_session_response = client.post("/start-session")
         assert start_session_response.status_code == 200
@@ -102,7 +102,7 @@ async def test_get_session_with_messages(client_with_db):
 @pytest.mark.asyncio
 async def test_add_message_to_session(client_with_db):
     """Test adding a message to an existing session."""
-    async with client_with_db as client:
+    with client_with_db as client:
         # Start a session
         start_session_response = client.post("/start-session")
         assert start_session_response.status_code == 200
@@ -130,7 +130,7 @@ async def test_add_message_to_session(client_with_db):
 @pytest.mark.asyncio
 async def test_add_message_to_nonexistent_session(client_with_db):
     """Test adding a message to a session that does not exist."""
-    async with client_with_db as client:
+    with client_with_db as client:
         fake_session_id = "123e4567-e89b-12d3-a456-426614174000"
         message_data = {"role": "user", "content": "This message should fail."}
         response = client.post(f"/session/{fake_session_id}", json=message_data)
