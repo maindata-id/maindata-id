@@ -214,6 +214,22 @@ export default function DatasetsPage() {
                             <h3 className="text-lg font-semibold">{dataset.title}</h3>
                             <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{dataset.description}</p>
                           </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 mt-4">
+                          <Badge variant="outline" className="text-xs">
+                            Added: {formatDate(dataset.source_at)}
+                          </Badge>
+                          {dataset.is_cors_allowed && (
+                            <Badge variant="outline" className="text-xs bg-green-50">
+                              CORS Allowed
+                            </Badge>
+                          )}
+                          {dataset.original_source && (
+                            <Badge variant="outline" className="text-xs">
+                              Source: {dataset.original_source}
+                            </Badge>
+                          )}
                           <div className="flex gap-2">
                             <TooltipProvider>
                               <Tooltip>
@@ -256,22 +272,6 @@ export default function DatasetsPage() {
                               </TooltipProvider>
                             )}
                           </div>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2 mt-4">
-                          <Badge variant="outline" className="text-xs">
-                            Added: {formatDate(dataset.source_at)}
-                          </Badge>
-                          {dataset.is_cors_allowed && (
-                            <Badge variant="outline" className="text-xs bg-green-50">
-                              CORS Allowed
-                            </Badge>
-                          )}
-                          {dataset.original_source && (
-                            <Badge variant="outline" className="text-xs">
-                              Source: {dataset.original_source}
-                            </Badge>
-                          )}
                         </div>
                       </div>
                     </Card>

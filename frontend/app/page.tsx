@@ -3,10 +3,11 @@
 import type React from "react"
 
 import { useRef } from "react"
-import { Sparkles } from "lucide-react"
+import { Sparkles, Github } from "lucide-react"
 import Link from "next/link"
 import NaturalLanguageInput, { type NaturalLanguageInputRef } from "@/components/natural-language-input"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
 const exampleQueries = [
   "apa 3 kota dengan jumlah sapi perah terbanyak di jawa barat?",
@@ -38,6 +39,18 @@ export default function Home() {
             </Link>
             <Link href="/about" className="text-sm font-medium hover:underline">
               About
+            </Link>
+            <Link
+              href="https://github.com/azophy/maindata-id"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(
+                buttonVariants({ variant: "default", size: "sm" }),
+                "flex items-center gap-1"
+              )}
+            >
+              <Github className="h-4 w-4" />
+              Star us on GitHub
             </Link>
           </nav>
         </div>

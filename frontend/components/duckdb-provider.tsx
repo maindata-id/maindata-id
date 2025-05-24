@@ -57,9 +57,10 @@ export default function DuckDBProvider({ children }: { children: React.ReactNode
 
         // Set a timeout to prevent hanging if initialization takes too long
         const timeoutPromise = new Promise<never>((_, reject) => {
+          const duckdbTimeout = process.env.NEXT_PUBLIC_DUCKDB_TIMEOUT || 30000
           initTimeout = setTimeout(() => {
-            reject(new Error("DuckDB initialization timed out after 20 seconds"))
-          }, 20000)
+            reject(new Error(`DuckDB initialization timed out after ${duckdbTimeout/1000} seconds`))
+          }, duckdbTimeout)
         })
 
         // Race between initialization and timeout
