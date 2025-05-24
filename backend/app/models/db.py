@@ -20,8 +20,19 @@ if DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
 
 # Create async engine
-engine = create_async_engine(DATABASE_URL, echo=True)
-AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+engine = create_async_engine(DATABASE_URL,
+    echo=True,
+    pool_size=20,          # Increase pool size
+    max_overflow=30,       # Allow overflow connections
+    pool_pre_ping=True,    # Validate connections
+    pool_recycle=3600,     # Recycle connections hourly
+    connect_args={
+        "server_settings": {
+            "application_name": "your_app_name"
+        }
+    }
+)
+AsyncSessionLocal = sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
 
 Base = declarative_base()
 

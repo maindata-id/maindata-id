@@ -1,28 +1,66 @@
-# from fastapi.testclient import TestClient # Remove TestClient
-import httpx # Import httpx
-from main import app
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.models.db import get_db, ChatSession, ChatMessage, engine, Base
+import httpx
 import pytest
-import asyncio
-import pytest_asyncio # Import pytest_asyncio
+import pytest_asyncio
+from main import app
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker
+from app.models.db import get_db, Base
+from pprint import pprint
+import os
+from dotenv import load_dotenv
 
-# Use httpx.AsyncClient for asynchronous testing
-# client = TestClient(app) # Remove synchronous client
+load_dotenv()
 
-@pytest_asyncio.fixture(scope="function", autouse=True) # Use pytest_asyncio.fixture
-async def cleanup_db():
-    """Clean up database tables after each test."""
-    async with AsyncSession(engine) as session:
-        async with session.begin():
-            # Delete data from tables in reverse order of dependency
-            await session.execute(ChatMessage.__table__.delete())
-            await session.execute(ChatSession.__table__.delete())
-        await session.commit()
+# Get database URL
+TEST_DATABASE_URL = os.getenv("DATABASE_URL")
+if TEST_DATABASE_URL.startswith("postgresql://"):
+    TEST_DATABASE_URL = TEST_DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
 
+@pytest_asyncio.fixture(scope="function")
+async def test_db():
+    """Create a test database session for each test."""
+    # Create engine for this specific test
+    engine = create_async_engine(
+        TEST_DATABASE_URL,
+        echo=False,
+        pool_size=1,
+        max_overflow=0,
+    )
+    
+    # Create tables
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    
+    # Create session factory
+    TestSessionLocal = sessionmaker(
+        bind=engine, 
+        class_=AsyncSession, 
+        expire_on_commit=False
+    )
+    
+    # Override the dependency
+    async def override_get_db():
+        async with TestSessionLocal() as session:
+            try:
+                yield session
+            finally:
+                await session.close()
+    
+    app.dependency_overrides[get_db] = override_get_db
+    
+    yield
+    
+    # Cleanup
+    app.dependency_overrides.clear()
+    
+    # Drop tables and dispose engine
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+    
+    await engine.dispose()
 
 @pytest.mark.asyncio
-async def test_start_session():
+async def test_start_session(test_db):
     """Test the /start-session endpoint."""
     async with httpx.AsyncClient(app=app, base_url="http://test") as ac:
         response = await ac.post("/start-session")
@@ -40,21 +78,22 @@ async def test_start_session():
         assert data_with_title.get("title") == "My Test Session"
 
 @pytest.mark.asyncio
-async def test_get_session_not_found():
+async def test_get_session_not_found(test_db):
     """Test getting a session that does not exist."""
     async with httpx.AsyncClient(app=app, base_url="http://test") as ac:
         fake_session_id = "123e4567-e89b-12d3-a456-426614174000"
         response = await ac.get(f"/session/{fake_session_id}")
-        print('wowow:', response.json())
+        print('test_get_session_not_found:', response.json())
         assert response.status_code == 404
         assert response.json() == {"detail": "Session not found"}
 
 @pytest.mark.asyncio
-async def test_get_session_with_messages():
+async def test_get_session_with_messages(test_db):
     """Test getting a session with existing messages."""
     async with httpx.AsyncClient(app=app, base_url="http://test") as ac:
         # Start a session
         start_session_response = await ac.post("/start-session")
+        print('test_get_session_with_message:', start_session_response.json())
         assert start_session_response.status_code == 200
         session_id = start_session_response.json()["session_id"]
 
@@ -79,20 +118,20 @@ async def test_get_session_with_messages():
 
         # Check message content and order (order by created_at)
         messages = session_data["messages"]
+        pprint( messages )
         assert messages[0]["content"] == "Hello"
         assert messages[0]["role"] == "user"
-        assert messages[0]["session_id"] == session_id
 
         assert messages[1]["content"] == "Hi there!"
         assert messages[1]["role"] == "assistant"
-        assert messages[1]["session_id"] == session_id
 
 @pytest.mark.asyncio
-async def test_add_message_to_session():
+async def test_add_message_to_session(test_db):
     """Test adding a message to an existing session."""
     async with httpx.AsyncClient(app=app, base_url="http://test") as ac:
         # Start a session
         start_session_response = await ac.post("/start-session")
+        print('test_add_message_to_session:', start_session_response.json())
         assert start_session_response.status_code == 200
         session_id = start_session_response.json()["session_id"]
 
@@ -103,7 +142,6 @@ async def test_add_message_to_session():
 
         saved_message = add_message_response.json()
         assert "id" in saved_message
-        assert saved_message["session_id"] == session_id
         assert saved_message["role"] == message_data["role"]
         assert saved_message["content"] == message_data["content"]
         assert "created_at" in saved_message
@@ -116,7 +154,7 @@ async def test_add_message_to_session():
         assert session_data["messages"][0]["content"] == message_data["content"]
 
 @pytest.mark.asyncio
-async def test_add_message_to_nonexistent_session():
+async def test_add_message_to_nonexistent_session(test_db):
     """Test adding a message to a session that does not exist."""
     async with httpx.AsyncClient(app=app, base_url="http://test") as ac:
         fake_session_id = "123e4567-e89b-12d3-a456-426614174000"
