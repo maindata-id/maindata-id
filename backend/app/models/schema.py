@@ -11,13 +11,17 @@ class GenerateSQLRequest(BaseModel):
 class StartSessionRequest(BaseModel):
     title: Optional[str] = None
 
+class SaveMessageRequest(BaseModel):
+    role: str
+    content: str
+
 # Response models
 class MessageModel(BaseModel):
     id: uuid.UUID
     role: str
     content: str
     created_at: datetime
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 class SessionModel(BaseModel):
