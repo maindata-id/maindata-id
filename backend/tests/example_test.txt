@@ -1,0 +1,35 @@
+import pytest
+
+@pytest.mark.asyncio
+async def test_some_other_endpoint(test_client):
+    """Example test for another endpoint."""
+    # The database is automatically set up by conftest.py
+    response = await test_client.get("/some-endpoint")
+    # Your test logic here...
+
+@pytest.mark.asyncio
+async def test_with_database_access(db_session):
+    """Example test with direct database access."""
+    from app.models.db import ChatSession
+    
+    # Database session is automatically provided
+    session = ChatSession(title="Test")
+    db_session.add(session)
+    await db_session.commit()
+    # Your test logic here...
+
+@pytest.mark.asyncio
+async def test_combined_access(test_client, db_session):
+    """Example test using both HTTP client and database access."""
+    # You can use both fixtures in the same test
+    response = await test_client.post("/start-session")
+    session_id = response.json()["session_id"]
+    
+    # Then query the database directly to verify
+    from app.models.db import ChatSession
+    from sqlalchemy import select
+    result = await db_session.execute(
+        select(ChatSession).where(ChatSession.id == session_id)
+    )
+    db_session_obj = result.scalar_one()
+    assert db_session_obj is not None
