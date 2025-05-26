@@ -1,19 +1,27 @@
 import os
 from typing import Dict, List, Any, AsyncGenerator
 from dotenv import load_dotenv
-import google.generativeai as genai
-from app.models.schema import DatasetReference, QueryReference, MessageModel
+# import google.generativeai as genai # Removed google.generativeai
+from langchain_community.chat_models.litellm import ChatLiteLLM # Import ChatLiteLLM
+from langchain_core.messages import HumanMessage # Import HumanMessage
 
 # Load environment variables
 load_dotenv()
 
-# Configure Gemini
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+# Configure LiteLLM and OpenRouter
+# GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") # Removed Google API Key
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
-genai.configure(api_key=GOOGLE_API_KEY)
+# genai.configure(api_key=GOOGLE_API_KEY) # Removed Google configuration
 
-# Initialize the model
-model = genai.GenerativeModel('gemini-2.5-pro-exp-03-25')
+# Get the model name from environment variable, default to gemini/gemini-2.0-flash-lite
+LITELLM_MODEL = os.getenv("LITELLM_MODEL", "gemini/gemini-2.0-flash-lite")
+# Ensure OPENROUTER_API_KEY is set in your environment variables
+
+# Initialize the LiteLLM chat model
+# LiteLLM automatically picks up OPENROUTER_API_KEY from environment variables
+# and uses the specified model.
+llm = ChatLiteLLM(model=LITELLM_MODEL, litellm_api_base="https://openrouter.ai/api/v1")
+
 
 def _create_prompt(
     question: str,
@@ -26,22 +34,22 @@ def _create_prompt(
     """
     # Format chat history
     formatted_history = "\n".join([
-        f"{msg.role.capitalize()}: {msg.content}" 
+        f"{msg.role.capitalize()}: {msg.content}"
         for msg in chat_history
     ])
-    
+
     # Format dataset information with table creation
     dataset_context = "\n".join([
         f"- {dataset.title}: {dataset.description}\n  Data URL: {API_BASE_URL}/dataset/{dataset.slug}"
         for dataset in datasets
     ])
-    
+
     # Format reference queries
     reference_context = "\n".join([
         f"- Title: {ref.title}\n  Description: {ref.description}\n  SQL: {ref.sql_query}"
         for ref in reference_queries
     ])
-    
+
     return f"""You are an AI data analyst specialized in generating SQL queries for Indonesian government data.
 Your task is to translate natural language questions into valid SQL queries using DuckDB dialect.
 
@@ -85,13 +93,19 @@ async def generate_sql_from_nl(
     reference_queries: List[QueryReference]
 ) -> Dict[str, str]:
     """
-    Generate SQL from natural language using Gemini with context
+    Generate SQL from natural language using LiteLLM with context via Langchain
     """
     try:
         prompt = _create_prompt(question, chat_history, datasets, reference_queries)
-        response = await model.generate_content_async(prompt)
+        messages = [HumanMessage(content=prompt)] # Langchain expects a list of messages
+
+        response = await llm.ainvoke(messages) # Use ainvoke for async call
+
+        # Langchain response structure
+        generated_text = response.content
+
         return {
-            "sql": response.text,
+            "sql": generated_text,
             "explanation": ""  # No need to parse as frontend will handle it
         }
     except Exception as e:
@@ -107,17 +121,15 @@ async def generate_sql_stream(
     reference_queries: List[QueryReference]
 ) -> AsyncGenerator[str, None]:
     """
-    Stream SQL generation results
+    Stream SQL generation results using LiteLLM via Langchain
     """
     try:
         prompt = _create_prompt(question, chat_history, datasets, reference_queries)
-        response = await model.generate_content_async(
-            prompt,
-            stream=True  # Enable streaming
-        )
-        
-        async for chunk in response:
-            if chunk.text:
-                yield chunk.text
+        messages = [HumanMessage(content=prompt)] # Langchain expects a list of messages
+
+        async for chunk in llm.astream(messages): # Use astream for async streaming
+            if chunk.content:
+                yield chunk.content
+
     except Exception as e:
         yield f"Error generating SQL: {str(e)}"
