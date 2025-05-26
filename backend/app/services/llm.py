@@ -53,7 +53,7 @@ When generating SQL:
 3. Consider the Indonesian context of the data
 4. Make use of the example queries if relevant
 5. Use DuckDB SQL dialect
-6. ALWAYS include the necessary data loading statements in your SQL if has not been loaded previously.
+6. ALWAYS include the necessary data loading statements in your SQL IF HAS NOT BEEN LOADED PREVIOUSLY.
 7. For each dataset used, first load it using:
    CREATE TABLE IF NOT EXISTS <table_name> AS SELECT * FROM read_csv('<url>');
 8. Use descriptive table names based on the dataset title (lowercase with underscores)
@@ -65,6 +65,7 @@ IMPORTANT: Format your response exactly as follows:
 3. Finally, provide the SQL query, including:
    - ALL required data loading statements first
    - The actual query second
+   - dont wrap with ``` or <pre> or anything like that
 
 Conversation history:
 {formatted_history if formatted_history else "No previous conversation."}
