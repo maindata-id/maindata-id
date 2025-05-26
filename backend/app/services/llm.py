@@ -1,7 +1,6 @@
 import os
 from typing import Dict, List, Any, AsyncGenerator
 from dotenv import load_dotenv
-# import google.generativeai as genai # Removed google.generativeai
 from langchain_community.chat_models.litellm import ChatLiteLLM # Import ChatLiteLLM
 from langchain_core.messages import HumanMessage # Import HumanMessage
 from app.models.schema import DatasetReference, QueryReference, MessageModel # Import necessary types
@@ -10,19 +9,13 @@ from app.models.schema import DatasetReference, QueryReference, MessageModel # I
 load_dotenv()
 
 # Configure LiteLLM and OpenRouter
-# GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") # Removed Google API Key
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
-# genai.configure(api_key=GOOGLE_API_KEY) # Removed Google configuration
 
 # Get the model name from environment variable, default to gemini/gemini-2.0-flash-lite
 LITELLM_MODEL = os.getenv("LITELLM_MODEL", "gemini/gemini-2.0-flash-lite")
-# Ensure OPENROUTER_API_KEY is set in your environment variables
 
 # Initialize the LiteLLM chat model
-# LiteLLM automatically picks up OPENROUTER_API_KEY from environment variables
-# and uses the specified model.
 llm = ChatLiteLLM(model=LITELLM_MODEL, litellm_api_base="https://openrouter.ai/api/v1")
-
 
 def _create_prompt(
     question: str,
