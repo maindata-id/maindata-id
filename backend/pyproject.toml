@@ -8,18 +8,18 @@ dependencies = [
     "alembic==1.13.1",
     "asyncpg==0.29.0",
     "fastapi[standard]>=0.115.6",
-    "google-generativeai==0.3.2", # Keep for now, might be removed later if not needed
+    "google-generativeai==0.3.2",
     "httpx==0.27.0",
+    "langchain-community>=0.2.5",
+    "litellm>=1.70.4",
     "numpy==1.26.4",
     "pgvector==0.2.5",
-    "pydantic==2.6.3",
+    "pydantic>=2.11.0",
     "python-dotenv==1.0.1",
     "python-jose==3.3.0",
     "python-multipart==0.0.9",
     "sqlalchemy==2.0.28",
     "uvicorn==0.29.0",
-    "litellm==1.37.1", # Added litellm
-    "langchain-community==0.2.10", # Added langchain-community
 ]
 
 [dependency-groups]
