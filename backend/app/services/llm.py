@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 # import google.generativeai as genai # Removed google.generativeai
 from langchain_community.chat_models.litellm import ChatLiteLLM # Import ChatLiteLLM
 from langchain_core.messages import HumanMessage # Import HumanMessage
+from app.models.schema import DatasetReference, QueryReference, MessageModel # Import necessary types
 
 # Load environment variables
 load_dotenv()
