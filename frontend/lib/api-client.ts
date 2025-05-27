@@ -2,6 +2,8 @@
  * API client for interacting with the MainData.id backend
  */
 
+import type { QueryResult } from "@/lib/duckdb"
+
 // Get the API base URL from environment variables or use the default
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://maindata-id.fly.dev"
 
@@ -43,6 +45,16 @@ export interface StartSessionResponse {
   session_id: string
   created_at: string
   title: string
+}
+
+export interface SaveMessageRequest {
+  role: "user" | "browser"
+  content: string
+  is_sql?: boolean
+  sql_query?: string
+  error?: string
+  query_results?: QueryResult[]
+  explanation?: string
 }
 
 /**
@@ -171,6 +183,51 @@ export async function getSession(sessionId: string): Promise<any> {
     throw error
   }
 }
+
+/**
+ * Save a message to a session
+ */
+export async function saveMessage(
+  sessionId: string,
+  role: "user" | "browser",
+  content: string,
+  isSQL: boolean = false,
+  sqlQuery?: string,
+  error?: string,
+  queryResults?: QueryResult[],
+  explanation?: string
+): Promise<void> {
+  try {
+    const messageData: SaveMessageRequest = {
+      role,
+      content,
+      is_sql: isSQL,
+      sql_query: sqlQuery,
+      error,
+      query_results: queryResults,
+      explanation,
+    }
+
+    const response = await fetch(`${API_BASE_URL}/session/${sessionId}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(messageData),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.detail || "Failed to save message")
+    }
+
+    // No return value expected for a successful save
+  } catch (error) {
+    console.error("Error saving message:", error)
+    throw error
+  }
+}
+
 
 /**
  * Test the API connection

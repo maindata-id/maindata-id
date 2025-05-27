@@ -16,6 +16,7 @@ import type { Dataset, QueryReference } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
 import { ApiStatus } from "./api-status"
 import { StreamingSqlGeneration } from "./streaming-sql-generation"
+import { getSession, saveMessage } from "@/lib/api-client" // Import API functions
 
 export interface Message {
   id: string
@@ -47,30 +48,64 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [initialQueryProcessed, setInitialQueryProcessed] = useState(false)
   const [isExecutingQuery, setIsExecutingQuery] = useState(false)
+  const [isLoadingSession, setIsLoadingSession] = useState(true) // New state for session loading
   const chatEndRef = useRef<HTMLDivElement>(null)
   const { isReady: isDuckDBReady } = useDuckDB()
 
-  // Set the session ID if provided
+  // Set the session ID if provided and load existing messages
   useEffect(() => {
-    if (sessionId) {
-      setCurrentSessionId(sessionId)
+    const loadSessionMessages = async () => {
+      if (sessionId) {
+        setCurrentSessionId(sessionId)
+        try {
+          setIsLoadingSession(true)
+          const sessionData = await getSession(sessionId)
+          const loadedMessages: Message[] = sessionData.messages.map((msg: any) => ({
+            id: msg.id,
+            type: msg.role === "user" ? "user" : "system", // Map backend role to frontend type
+            content: msg.content,
+            timestamp: new Date(msg.created_at),
+            isSQL: msg.is_sql, // Assuming backend provides this
+            queryResults: msg.query_results, // Assuming backend provides this
+            error: msg.error, // Assuming backend provides this
+            sqlQuery: msg.sql_query, // Assuming backend provides this
+            explanation: msg.explanation, // Assuming backend provides this
+            // Add other fields if needed from backend
+          }))
+          setMessages(loadedMessages)
+        } catch (error) {
+          console.error("Failed to load session messages:", error)
+          // Optionally add an error message to the chat
+          setMessages([
+            {
+              id: "load-error",
+              type: "system",
+              content: "Failed to load previous session messages.",
+              timestamp: new Date(),
+              isSQL: false,
+              error: "Failed to load previous session messages.",
+            },
+          ])
+        } finally {
+          setIsLoadingSession(false)
+        }
+      } else {
+        // If no session ID, show welcome message immediately
+        setMessages([
+          {
+            id: "welcome",
+            type: "system",
+            content: "Welcome to MainData.id! You can create tables and query data using SQL or natural language.",
+            timestamp: new Date(),
+            isSQL: false,
+          },
+        ])
+        setIsLoadingSession(false)
+      }
     }
-  }, [sessionId])
 
-  // Welcome message
-  useEffect(() => {
-    if (messages.length === 0) {
-      setMessages([
-        {
-          id: "welcome",
-          type: "system",
-          content: "Welcome to MainData.id! You can create tables and query data using SQL or natural language.",
-          timestamp: new Date(),
-          isSQL: false,
-        },
-      ])
-    }
-  }, [messages.length])
+    loadSessionMessages()
+  }, [sessionId])
 
   // Load available tables when DuckDB is ready
   useEffect(() => {
@@ -86,9 +121,9 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
     }
   }, [isDuckDBReady, tablesLoaded])
 
-  // Process initial query or dataset if provided
+  // Process initial query or dataset if provided after session is loaded and DuckDB is ready
   useEffect(() => {
-    if (isDuckDBReady && messages.length > 0 && !initialQueryProcessed) {
+    if (isDuckDBReady && !isLoadingSession && messages.length > 0 && !initialQueryProcessed) {
       setInitialQueryProcessed(true)
 
       if (initialQuery) {
@@ -108,7 +143,7 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
         handleSendMessage(sql, true)
       }
     }
-  }, [initialQuery, initialDataset, isDuckDBReady, messages.length, initialQueryProcessed])
+  }, [initialQuery, initialDataset, isDuckDBReady, isLoadingSession, messages.length, initialQueryProcessed])
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -116,7 +151,7 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
   }, [messages])
 
   const handleSendMessage = async (content: string, isSQL: boolean) => {
-    if (!content.trim() || !isDuckDBReady) return
+    if (!content.trim() || !isDuckDBReady || !sessionId) return // Ensure sessionId exists
 
     // Generate unique ID for the message
     const messageId = `msg-${Date.now()}`
@@ -132,6 +167,14 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
 
     setMessages((prev) => [...prev, userMessage])
 
+    // Save user message to backend
+    try {
+      await saveMessage(sessionId, "user", content, isSQL)
+    } catch (error) {
+      console.error("Failed to save user message:", error)
+      // Optionally add a system message indicating save failure
+    }
+
     if (isSQL) {
       // For SQL queries, use the existing flow
       handleSqlQuery(content)
@@ -142,6 +185,8 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
   }
 
   const handleSqlQuery = async (sql: string) => {
+    if (!sessionId) return
+
     // Add loading message
     const loadingMessageId = `loading-${Date.now()}`
     const loadingMessage: Message = {
@@ -197,9 +242,17 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
         timestamp: new Date(),
         isSQL: false,
         queryResults,
+        sqlQuery: sql, // Include the executed SQL
       }
 
       setMessages((prev) => [...prev, resultMessage])
+
+      // Save result message to backend
+      try {
+        await saveMessage(sessionId, "browser", resultSummary, false, sql, undefined, queryResults)
+      } catch (error) {
+        console.error("Failed to save SQL result message:", error)
+      }
     } catch (err: any) {
       // Set executing query state to false
       setIsExecutingQuery(false)
@@ -215,13 +268,23 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
         timestamp: new Date(),
         isSQL: false,
         error: err.message,
+        sqlQuery: sql, // Include the failed SQL
       }
 
       setMessages((prev) => [...prev, errorMessage])
+
+      // Save error message to backend
+      try {
+        await saveMessage(sessionId, "browser", `Error executing SQL query: ${err.message}`, false, sql, err.message)
+      } catch (error) {
+        console.error("Failed to save SQL error message:", error)
+      }
     }
   }
 
   const handleNaturalLanguageQuery = (query: string) => {
+    if (!sessionId) return
+
     // Add streaming message
     const streamingMessageId = `streaming-${Date.now()}`
     const streamingMessage: Message = {
@@ -244,6 +307,8 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
 
   // Function to handle completion of SQL generation
   const handleStreamingComplete = async (sql: string, explanation: string) => {
+    if (!sessionId) return
+
     try {
       // Validate SQL before executing
       const cleanedSql = validateAndCleanSql(sql)
@@ -275,6 +340,13 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
         const filteredMessages = prev.filter((msg) => !msg.isStreaming)
         return [...filteredMessages, resultMessage]
       })
+
+      // Save result message to backend
+      try {
+        await saveMessage(sessionId, "browser", "I've translated your question to SQL and executed it.", false, cleanedSql, undefined, queryResults, explanation)
+      } catch (error) {
+        console.error("Failed to save NL result message:", error)
+      }
     } catch (err: any) {
       // Set executing query state to false
       setIsExecutingQuery(false)
@@ -287,7 +359,7 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
         timestamp: new Date(),
         isSQL: false,
         error: err.message,
-        sqlQuery: sql,
+        sqlQuery: sql, // Include the generated SQL
         explanation,
       }
 
@@ -296,6 +368,13 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
         const filteredMessages = prev.filter((msg) => !msg.isStreaming)
         return [...filteredMessages, errorMessage]
       })
+
+      // Save error message to backend
+      try {
+        await saveMessage(sessionId, "browser", `Error executing the generated SQL: ${err.message}`, false, sql, err.message, undefined, explanation)
+      } catch (error) {
+        console.error("Failed to save NL error message:", error)
+      }
     }
   }
 
@@ -320,8 +399,10 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
 
   // Function to handle cancellation
   const handleCancel = (streamingMessageId: string) => {
+    if (!sessionId) return
+
     // Remove streaming message
-    setMessages((prev) => prev.filter((msg) => msg.id !== streamingMessageId))
+    setMessages((prev) => prev.filter((msg) => !msg.isStreaming)) // Remove all streaming messages
 
     // Add cancelled message
     const cancelledMessage: Message = {
@@ -333,6 +414,13 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
     }
 
     setMessages((prev) => [...prev, cancelledMessage])
+
+    // Optionally save cancellation to backend
+    try {
+      saveMessage(sessionId, "browser", "SQL generation cancelled.", false)
+    } catch (error) {
+      console.error("Failed to save cancellation message:", error)
+    }
   }
 
   // Check if any message is currently streaming
@@ -340,7 +428,7 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
 
   // Check if we should show the "No tables" alert
   const shouldShowNoTablesAlert =
-    isDuckDBReady && tables.length === 0 && tablesLoaded && !isExecutingQuery && !isAnyMessageStreaming
+    isDuckDBReady && tables.length === 0 && tablesLoaded && !isExecutingQuery && !isAnyMessageStreaming && !isLoadingSession
 
   return (
     <div className="flex flex-col h-full">
@@ -350,6 +438,12 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
           <ApiStatus />
           {sessionId && (
             <div className="px-2 py-1 text-xs bg-muted rounded-md">Session: {sessionId.substring(0, 8)}...</div>
+          )}
+          {isLoadingSession && (
+             <div className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-md animate-pulse">
+             <Loader2 className="h-3 w-3 animate-spin" />
+             <span>Loading session...</span>
+           </div>
           )}
           {isExecutingQuery && (
             <div className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-md animate-pulse">
@@ -389,7 +483,7 @@ export function ChatContainer({ sessionId, initialQuery, initialDataset }: ChatC
       </div>
 
       <div className="border-t p-4">
-        <ChatInput onSendMessage={handleSendMessage} disabled={!isDuckDBReady || isExecutingQuery} />
+        <ChatInput onSendMessage={handleSendMessage} disabled={!isDuckDBReady || isExecutingQuery || isLoadingSession} />
       </div>
 
     </div>
