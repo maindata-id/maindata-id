@@ -131,8 +131,6 @@ uv run ptw .
 - [x] RAG-enhanced query understanding
 - [x] stream based response to frontend
 - [ ] basic user registration & login, and history management
-- [ ] Chart suggestion + auto-viz
-- [ ] One-click CSV upload for user datasets
 - [ ] Dataset versioning and provenance info
 
 ## 🤝 Contributing
